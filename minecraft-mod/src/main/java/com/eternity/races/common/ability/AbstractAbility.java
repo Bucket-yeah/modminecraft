@@ -6,6 +6,8 @@ import com.eternity.races.common.registry.ModAttachments;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
@@ -14,25 +16,12 @@ import net.minecraft.world.level.Level;
  */
 public abstract class AbstractAbility {
 
-    /** Уникальный идентификатор способности */
     public final ResourceLocation id;
-
-    /** Ключ локализации для GUI */
     public final String nameKey;
-
-    /** Ключ описания для GUI */
     public final String descKey;
-
-    /** Базовый кулдаун в тиках (без учёта уровня кольца) */
     public final int baseCooldownTicks;
-
-    /** Стоимость разблокировки в очках рас */
     public final int unlockCost;
-
-    /** ID расы, которой принадлежит способность (1-15) */
     public final int raceId;
-
-    /** Индекс в массиве способностей (0-7) */
     public final int abilityIndex;
 
     protected AbstractAbility(ResourceLocation id, String nameKey, String descKey,
@@ -46,18 +35,8 @@ public abstract class AbstractAbility {
         this.abilityIndex = abilityIndex;
     }
 
-    // ─── Абстрактные методы ──────────────────────────────────────────────────
-
-    /**
-     * Основная логика способности. Вызывается на сервере.
-     */
     public abstract void execute(Player player, Level level);
 
-    // ─── Конкретные методы ───────────────────────────────────────────────────
-
-    /**
-     * Проверяет, может ли игрок использовать способность прямо сейчас.
-     */
     public boolean canUse(Player player) {
         RaceData data = player.getData(ModAttachments.RACE_DATA.get());
         if (!data.hasChosen() || data.getRaceId() != raceId) return false;
@@ -66,10 +45,6 @@ public abstract class AbstractAbility {
         return true;
     }
 
-    /**
-     * Возвращает эффективный кулдаун в тиках с учётом уровня кольца и конфига.
-     * Формула: base * (1 - level * 0.02) * configMultiplier
-     */
     public int getCooldownTicks(Player player) {
         RaceData data = player.getData(ModAttachments.RACE_DATA.get());
         int level = data.getAccessoryLevel();
@@ -78,10 +53,6 @@ public abstract class AbstractAbility {
         return (int) Math.max(5, baseCooldownTicks * reduction * configMultiplier);
     }
 
-    /**
-     * Возвращает множитель урона с учётом уровня кольца.
-     * Формула: 1 + level * 0.05
-     */
     public float getDamageMultiplier(Player player) {
         RaceData data = player.getData(ModAttachments.RACE_DATA.get());
         int level = data.getAccessoryLevel();
@@ -89,29 +60,64 @@ public abstract class AbstractAbility {
         return (1f + level * 0.05f) * configMult;
     }
 
-    /**
-     * Возвращает множитель длительности с учётом уровня кольца.
-     * Формула: 1 + level * 0.03
-     */
     public float getDurationMultiplier(Player player) {
         RaceData data = player.getData(ModAttachments.RACE_DATA.get());
         int level = data.getAccessoryLevel();
         return 1f + level * 0.03f;
     }
 
-    /**
-     * Отправляет игроку сообщение в ActionBar об активации способности.
-     */
     protected void notifyActivation(Player player, String message) {
         if (RacesConfig.COMMON.showActionbarMessages.get()) {
             player.displayClientMessage(Component.literal(message), true);
         }
     }
 
-    /**
-     * Проверяет, ослаблена ли способность (например, Эхо-Голем на шерсти).
-     */
     public boolean isWeakened(Player player) {
         return player.getPersistentData().getBoolean(raceId + "_weakened");
+    }
+
+    // ─── Утилиты для расхода ресурсов ────────────────────────────────────────
+
+    protected boolean consumeHunger(Player player, int halvesOfFood) {
+        if (player.getFoodData().getFoodLevel() < halvesOfFood) {
+            notifyActivation(player, "§cНедостаточно голода!");
+            return false;
+        }
+        player.getFoodData().addExhaustion(halvesOfFood * 4f);
+        return true;
+    }
+
+    protected boolean consumeHealth(Player player, float damage) {
+        if (player.getHealth() <= damage) {
+            notifyActivation(player, "§cНедостаточно здоровья!");
+            return false;
+        }
+        player.hurt(player.damageSources().magic(), damage);
+        return true;
+    }
+
+    protected boolean consumeXp(Player player, int levels) {
+        if (player.experienceLevel < levels) {
+            notifyActivation(player, "§cНедостаточно уровней опыта (нужно " + levels + ")!");
+            return false;
+        }
+        player.giveExperienceLevels(-levels);
+        return true;
+    }
+
+    protected boolean hasItem(Player player, Item item, int count) {
+        return player.getInventory().countItem(item) >= count;
+    }
+
+    protected void removeItem(Player player, Item item, int count) {
+        int toRemove = count;
+        for (int i = 0; i < player.getInventory().getContainerSize() && toRemove > 0; i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.is(item)) {
+                int take = Math.min(toRemove, stack.getCount());
+                stack.shrink(take);
+                toRemove -= take;
+            }
+        }
     }
 }

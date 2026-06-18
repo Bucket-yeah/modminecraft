@@ -10,24 +10,14 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.alchemy.PotionContents;
-import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 /** Раса 10 — Алхимик-Трансмутатор: все 8 способностей */
 public class AlchemistTransmutorAbilities {
-
-    // Список руд для случайной трансмутации
-    private static final Block[] RANDOM_ORES = {
-        Blocks.COAL_ORE, Blocks.IRON_ORE, Blocks.GOLD_ORE,
-        Blocks.DIAMOND_ORE, Blocks.EMERALD_ORE, Blocks.LAPIS_ORE,
-        Blocks.REDSTONE_ORE, Blocks.COPPER_ORE
-    };
 
     public static void registerAll(Consumer<AbstractAbility> reg) {
         reg.accept(new Transmutation());
@@ -44,78 +34,96 @@ public class AlchemistTransmutorAbilities {
         return ResourceLocation.fromNamespaceAndPath(RacesMod.MOD_ID, name);
     }
 
-    // 0. Трансмутация — блок → случайная руда
+    /** 10.1 Трансмутация — блок в другой (100t, 1 голод) */
     public static class Transmutation extends AbstractAbility {
         public Transmutation() {
             super(id("transmutation"), "ability.racecraft.transmutation.name",
-                    "ability.racecraft.transmutation.desc", 200, 0, 10, 0);
+                    "ability.racecraft.transmutation.desc", 100, 0, 10, 0);
         }
         @Override
         public void execute(Player player, Level level) {
-            var pos = player.blockPosition().relative(player.getDirection());
-            if (!level.getBlockState(pos).isAir() && !level.getBlockState(pos).is(net.minecraft.tags.BlockTags.WITHER_IMMUNE)) {
-                int idx = level.random.nextInt(RANDOM_ORES.length);
-                level.setBlockAndUpdate(pos, RANDOM_ORES[idx].defaultBlockState());
-                // 10% шанс взрыва
-                if (Math.random() < 0.1) {
-                    level.explode(player, pos.getX(), pos.getY(), pos.getZ(), 1.5f, Level.ExplosionInteraction.NONE);
-                    notifyActivation(player, "§cТрансмутация взорвалась!");
-                } else {
-                    notifyActivation(player, "§6Трансмутация!");
-                }
+            if (!consumeHunger(player, 1)) return;
+            BlockPos pos = player.blockPosition().relative(player.getDirection());
+            var state = level.getBlockState(pos);
+            if (state.isAir() || state.is(net.minecraft.tags.BlockTags.WITHER_IMMUNE)) {
+                notifyActivation(player, "§aПрицелься на обычный блок!");
+                return;
             }
+            // Таблица трансмутации
+            var block = state.getBlock();
+            if (block == Blocks.DIRT || block == Blocks.GRASS_BLOCK) level.setBlockAndUpdate(pos, Blocks.SAND.defaultBlockState());
+            else if (block == Blocks.SAND) level.setBlockAndUpdate(pos, Blocks.COBBLESTONE.defaultBlockState());
+            else if (block == Blocks.COBBLESTONE) level.setBlockAndUpdate(pos, Blocks.STONE.defaultBlockState());
+            else if (block == Blocks.STONE) level.setBlockAndUpdate(pos, Blocks.GOLD_BLOCK.defaultBlockState());
+            else if (block == Blocks.GOLD_BLOCK) level.setBlockAndUpdate(pos, Blocks.IRON_BLOCK.defaultBlockState());
+            else if (block == Blocks.IRON_BLOCK) level.setBlockAndUpdate(pos, Blocks.DIAMOND_BLOCK.defaultBlockState());
+            else if (block == Blocks.GRAVEL) level.setBlockAndUpdate(pos, Blocks.COAL_ORE.defaultBlockState());
+            else if (block == Blocks.OAK_LOG || block == Blocks.BIRCH_LOG || block == Blocks.SPRUCE_LOG)
+                level.setBlockAndUpdate(pos, Blocks.IRON_ORE.defaultBlockState());
+            else {
+                level.setBlockAndUpdate(pos, Blocks.STONE.defaultBlockState());
+            }
+            notifyActivation(player, "§aТрансмутация!");
         }
     }
 
-    // 1. Упрочнение — +200% прочность инструмента
+    /** 10.2 Закалка — +40% защита 15 сек, -20% скорость (600t, 1 голод) */
     public static class Hardening extends AbstractAbility {
         public Hardening() {
             super(id("hardening"), "ability.racecraft.hardening.name",
-                    "ability.racecraft.hardening.desc", 1200, 0, 10, 1);
+                    "ability.racecraft.hardening.desc", 600, 0, 10, 1);
         }
         @Override
         public void execute(Player player, Level level) {
-            float dur = 1200 * getDurationMultiplier(player);
-            player.addEffect(new MobEffectInstance(MobEffects.DIG_SPEED, (int) dur, 2));
-            notifyActivation(player, "§6Упрочнение — инструменты усилены!");
+            if (!consumeHunger(player, 1)) return;
+            int dur = (int)(300 * getDurationMultiplier(player));
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, dur, 1));
+            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, dur, 0));
+            notifyActivation(player, "§aЗакалка! +40% защита, -20% скорость 15 сек.");
         }
     }
 
-    // 2. Превращение в жидкость — блок становится проходимым
+    /** 10.3 Разжижение — жидкий металл 10 сек, +урон (400t, 1 голод) */
     public static class Liquify extends AbstractAbility {
         public Liquify() {
             super(id("liquify"), "ability.racecraft.liquify.name",
-                    "ability.racecraft.liquify.desc", 300, 0, 10, 2);
+                    "ability.racecraft.liquify.desc", 400, 0, 10, 2);
         }
         @Override
         public void execute(Player player, Level level) {
-            var pos = player.blockPosition().relative(player.getDirection());
-            if (!level.getBlockState(pos).isAir()) {
-                level.setBlockAndUpdate(pos, Blocks.WATER.defaultBlockState());
-                player.getPersistentData().putLong("liquify_pos_x", pos.getX());
-                player.getPersistentData().putLong("liquify_pos_y", pos.getY());
-                player.getPersistentData().putLong("liquify_pos_z", pos.getZ());
-                player.getPersistentData().putLong("liquify_expire", level.getGameTime() + 200);
-                notifyActivation(player, "§6Блок разжижен!");
-            }
+            if (!consumeHunger(player, 1)) return;
+            float dmg = 5f * getDamageMultiplier(player);
+            int dur = (int)(200 * getDurationMultiplier(player));
+            // АоЕ удар жидким металлом
+            AABB box = player.getBoundingBox().inflate(3);
+            level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player)
+                    .forEach(e -> {
+                        e.hurt(player.damageSources().playerAttack(player), dmg);
+                        e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, dur, 1));
+                    });
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, dur, 1));
+            notifyActivation(player, "§aРазжижение! Удар металлом, бонус урона 10 сек.");
         }
     }
 
-    // 3. Алхимический щит — поглощение 4 урона (Ветка A)
+    /** 10.4 Алхимический щит — поглощение 10 урона (300t, 1 голод) */
     public static class AlchemyShield extends AbstractAbility {
         public AlchemyShield() {
             super(id("alchemy_shield"), "ability.racecraft.alchemy_shield.name",
-                    "ability.racecraft.alchemy_shield.desc", 400, 20, 10, 3);
+                    "ability.racecraft.alchemy_shield.desc", 300, 20, 10, 3);
         }
         @Override
         public void execute(Player player, Level level) {
-            float dur = 100 * getDurationMultiplier(player);
-            player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, (int) dur, 1));
-            notifyActivation(player, "§6Алхимический щит +4♥ поглощения!");
+            if (!consumeHunger(player, 1)) return;
+            int dur = (int)(200 * getDurationMultiplier(player));
+            int absLevel = 4 + getAccessoryLevel(player) / 2;
+            player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, dur, absLevel));
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, dur, 0));
+            notifyActivation(player, "§aАлхимический щит! Поглощение " + (absLevel + 1) * 4 + "♥.");
         }
     }
 
-    // 4. Обмен веществ — конвертация HP ↔ голод (Ветка A)
+    /** 10.5 Метаболизм — еда даёт ×2 насыщение (200t, ничего) */
     public static class Metabolism extends AbstractAbility {
         public Metabolism() {
             super(id("metabolism"), "ability.racecraft.metabolism.name",
@@ -123,58 +131,53 @@ public class AlchemistTransmutorAbilities {
         }
         @Override
         public void execute(Player player, Level level) {
-            if (player.getHealth() > 4) {
-                player.hurt(player.damageSources().magic(), 4f);
-                player.getFoodData().eat(8, 1f);
-                notifyActivation(player, "§6Обмен: -2♥ → +4 голода");
-            } else {
-                notifyActivation(player, "§cНедостаточно здоровья!");
-            }
+            int dur = (int)(400 * getDurationMultiplier(player));
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, dur, 1));
+            player.addEffect(new MobEffectInstance(MobEffects.SATURATION, dur, 1));
+            notifyActivation(player, "§aМетаболизм! Реген + насыщение на 20 сек.");
         }
     }
 
-    // 5. Золотое касание — мгновенное убийство слабого моба (Ветка B)
+    /** 10.6 Золотое прикосновение — преобразование предметов в золото (1200t, 2 голода) */
     public static class GoldenTouch extends AbstractAbility {
         public GoldenTouch() {
             super(id("golden_touch"), "ability.racecraft.golden_touch.name",
-                    "ability.racecraft.golden_touch.desc", 400, 20, 10, 5);
+                    "ability.racecraft.golden_touch.desc", 1200, 20, 10, 5);
         }
         @Override
         public void execute(Player player, Level level) {
-            AABB box = player.getBoundingBox().inflate(3);
-            level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player)
-                    .stream().filter(e -> e.getHealth() < e.getMaxHealth() * 0.3f)
-                    .findFirst()
-                    .ifPresent(e -> {
-                        e.hurt(player.damageSources().playerAttack(player), e.getHealth() + 1);
-                        notifyActivation(player, "§6Золотое касание — мгновенная смерть!");
-                    });
+            if (!consumeHunger(player, 2)) return;
+            int converted = 0;
+            for (int i = 0; i < 36 && converted < 5 + getAccessoryLevel(player); i++) {
+                ItemStack stack = player.getInventory().getItem(i);
+                if (!stack.isEmpty() && !stack.is(Items.GOLD_INGOT) && !stack.is(Items.GOLD_BLOCK)) {
+                    player.getInventory().setItem(i, new ItemStack(Items.GOLD_INGOT, stack.getCount()));
+                    converted++;
+                }
+            }
+            notifyActivation(player, "§aЗолотое прикосновение! " + converted + " стаков → золото.");
         }
     }
 
-    // 6. Стабилизация — восстановление блоков в радиусе 5 (Ветка B)
+    /** 10.7 Стабилизация — стабилизация предметов на 2 мин (2400t, 3 XP уровня) */
     public static class Stabilization extends AbstractAbility {
         public Stabilization() {
             super(id("stabilization"), "ability.racecraft.stabilization.name",
-                    "ability.racecraft.stabilization.desc", 600, 20, 10, 6);
+                    "ability.racecraft.stabilization.desc", 2400, 20, 10, 6);
         }
         @Override
         public void execute(Player player, Level level) {
-            // Восстанавливаем каменные блоки вокруг
-            var center = player.blockPosition();
-            for (int x = -3; x <= 3; x++) for (int y = -1; y <= 1; y++) for (int z = -3; z <= 3; z++) {
-                var pos = center.offset(x, y, z);
-                if (level.getBlockState(pos).isAir() && level.getBlockState(pos.below()).isSolid()) {
-                    // Заполняем воздух камнем (симуляция "восстановления")
-                    // На самом деле просто обновляем блоки
-                }
-            }
-            player.heal(4f);
-            notifyActivation(player, "§6Стабилизация — окружение восстановлено!");
+            if (!consumeXp(player, 3)) return;
+            int dur = (int)(2400 * getDurationMultiplier(player));
+            player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, dur, 0));
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, dur, 1));
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, dur, 0));
+            player.getPersistentData().putLong("alchimist_stable_expire", level.getGameTime() + dur);
+            notifyActivation(player, "§aСтабилизация на 2 мин! Огнеупорность + защита + реген.");
         }
     }
 
-    // 7. Синтез — создание случайного зелья из 3 предметов (Tier 3)
+    /** 10.8 Синтез — 3 предмета → улучшенный (400t, 3 предмета) */
     public static class Synthesis extends AbstractAbility {
         public Synthesis() {
             super(id("synthesis"), "ability.racecraft.synthesis.name",
@@ -182,21 +185,30 @@ public class AlchemistTransmutorAbilities {
         }
         @Override
         public void execute(Player player, Level level) {
-            int consumed = 0;
-            for (int i = 0; i < 36 && consumed < 3; i++) {
+            int found = 0;
+            int firstSlot = -1;
+            for (int i = 0; i < 36 && found < 3; i++) {
                 if (!player.getInventory().getItem(i).isEmpty()) {
+                    if (firstSlot == -1) firstSlot = i;
                     player.getInventory().getItem(i).shrink(1);
-                    consumed++;
+                    found++;
                 }
             }
-            if (consumed < 3) {
-                notifyActivation(player, "§cНедостаточно предметов (нужно 3)!");
-                return;
-            }
-            // Создаём случайное зелье
-            ItemStack potion = PotionContents.createItemStack(Items.POTION, Potions.HEALING);
-            player.addItem(potion);
-            notifyActivation(player, "§6Синтез — зелье создано!");
+            if (found < 3) { notifyActivation(player, "§cНужно минимум 3 предмета в инвентаре!"); return; }
+            int lvl = getAccessoryLevel(player);
+            ItemStack result;
+            int r = level.random.nextInt(5 + lvl);
+            if (r == 0) result = new ItemStack(Items.DIAMOND, 1 + lvl / 4);
+            else if (r == 1) result = new ItemStack(Items.EMERALD, 2 + lvl / 3);
+            else if (r == 2) result = new ItemStack(Items.GOLD_INGOT, 3 + lvl / 2);
+            else if (r == 3) result = new ItemStack(Items.IRON_INGOT, 5 + lvl);
+            else result = new ItemStack(Items.EXPERIENCE_BOTTLE, 3);
+            player.addItem(result);
+            notifyActivation(player, "§aСинтез! Получен: " + result.getDescriptionId());
         }
+    }
+
+    private static int getAccessoryLevel(Player player) {
+        return player.getData(com.eternity.races.common.registry.ModAttachments.RACE_DATA.get()).getAccessoryLevel();
     }
 }

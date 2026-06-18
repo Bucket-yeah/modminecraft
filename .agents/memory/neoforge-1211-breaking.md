@@ -37,4 +37,29 @@ Fix: `p.getLastHurtByMob() != null && (p.tickCount - p.getLastHurtByMobTimestamp
 `ItemEntity` — не `LivingEntity`, у него нет `addEffect`.
 Fix: `itemEntity.setGlowingTag(true)` для подсветки.
 
+## FallingBlockEntity constructor — приватный в 1.21.1
+`new FallingBlockEntity(Level, x, y, z, BlockState)` — конструктор приватный.
+Fix: `FallingBlockEntity.fall(level, BlockPos.containing(x, y, z), blockState)` — статический фабричный метод. `.fall()` сам спавнит сущность в мире, `addFreshEntity()` не нужен.
+
+## LightningBolt constructor изменился
+`new LightningBolt(Level, x, y, z, bool)` не существует.
+Fix: `new LightningBolt(EntityType.LIGHTNING_BOLT, level)` + `bolt.setPos(x,y,z)` + `bolt.setVisualOnly(false)` + `sl.addFreshEntity(bolt)`.
+
+## MobEffects.MINING_FATIGUE переименован
+`MobEffects.MINING_FATIGUE` → `MobEffects.DIG_SLOWDOWN` в 1.21.1.
+
+## MobEffects.THORNS не существует в 1.21.1
+Шипы реализуются через persistent data флаг `nature_armor_expire`, а не через эффект. RaceEventHandler перехватывает `LivingHurtEvent` и наносит отражённый урон вручную.
+
+## Items.GOLDEN_INGOT не существует
+Правильное имя: `Items.GOLD_INGOT`.
+
+## Player.getRespawnPosition() недоступен на базовом типе Player
+Метод `getRespawnPosition()` есть только у `ServerPlayer`.
+Fix: `if (player instanceof ServerPlayer sp) { BlockPos pos = sp.getRespawnPosition(); ... }`
+
+## Переменные в lambda должны быть effectively final
+Если переменная переопределяется через `*=`, она не effectively final.
+Fix: копировать в `final float finalVar = var;` перед передачей в lambda.
+
 **Why:** Все эти изменения произошли между 1.20.x и 1.21.1 в рамках рефакторинга Mojang/NeoForge.

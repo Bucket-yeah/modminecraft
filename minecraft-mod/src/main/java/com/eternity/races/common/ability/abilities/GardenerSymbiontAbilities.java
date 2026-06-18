@@ -11,8 +11,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.*;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 
 import java.util.function.Consumer;
@@ -26,7 +25,7 @@ public class GardenerSymbiontAbilities {
         reg.accept(new RootBond());
         reg.accept(new NatureArmor());
         reg.accept(new Photosynthesis());
-        reg.accept(new MetabolismGardener());
+        reg.accept(new Metabolism());
         reg.accept(new FlowerRain());
         reg.accept(new Entangle());
     }
@@ -35,155 +34,167 @@ public class GardenerSymbiontAbilities {
         return ResourceLocation.fromNamespaceAndPath(RacesMod.MOD_ID, name);
     }
 
-    // 0. Благословение роста — мгновенный рост урожая
+    /** 11.1 Благословение роста — ускорение роста растений в 5 блоках (600t, 2 голода + 2 костяной муки) */
     public static class GrowthBlessing extends AbstractAbility {
         public GrowthBlessing() {
             super(id("growth_blessing"), "ability.racecraft.growth_blessing.name",
-                    "ability.racecraft.growth_blessing.desc", 400, 0, 11, 0);
+                    "ability.racecraft.growth_blessing.desc", 600, 0, 11, 0);
         }
         @Override
         public void execute(Player player, Level level) {
-            var center = player.blockPosition();
+            if (!consumeHunger(player, 2)) return;
+            if (!hasItem(player, Items.BONE_MEAL, 2)) {
+                notifyActivation(player, "§2Нужно 2 костяной муки!"); return;
+            }
+            removeItem(player, Items.BONE_MEAL, 2);
+            int radius = 5 + getAccessoryLevel(player) / 2;
             int grown = 0;
-            for (int x = -5; x <= 5; x++) for (int z = -5; z <= 5; z++) {
-                var pos = center.offset(x, 0, z);
-                BlockState state = level.getBlockState(pos);
-                if (state.getBlock() instanceof CropBlock crop) {
-                    if (!crop.isMaxAge(state)) {
-                        level.setBlockAndUpdate(pos, crop.getStateForAge(crop.getMaxAge()));
+            for (BlockPos pos : BlockPos.betweenClosed(
+                    player.blockPosition().offset(-radius, -2, -radius),
+                    player.blockPosition().offset(radius, 2, radius))) {
+                var state = level.getBlockState(pos);
+                if (state.is(net.minecraft.tags.BlockTags.CROPS) || state.is(Blocks.WHEAT)
+                        || state.is(Blocks.CARROTS) || state.is(Blocks.POTATOES)
+                        || state.is(Blocks.BEETROOTS) || state.is(Blocks.MELON_STEM)
+                        || state.is(Blocks.PUMPKIN_STEM)) {
+                    net.minecraft.world.level.block.BonemealableBlock bonemeal =
+                            state.getBlock() instanceof net.minecraft.world.level.block.BonemealableBlock bb ? bb : null;
+                    if (bonemeal != null && bonemeal.isValidBonemealTarget(level, pos, state)) {
+                        bonemeal.performBonemeal((net.minecraft.server.level.ServerLevel) level, level.random, pos, state);
                         grown++;
                     }
                 }
             }
-            notifyActivation(player, "§aБлагословение роста! Выросло: " + grown + " культур.");
+            notifyActivation(player, "§2Благословение роста! Ускорено " + grown + " растений.");
         }
     }
 
-    // 1. Целебный сок — лечение при касании травы/листьев
+    /** 11.2 Целебный сок — выпить, восстановить 6♥ (1200t, 1 голод) */
     public static class HealingJuice extends AbstractAbility {
         public HealingJuice() {
             super(id("healing_juice"), "ability.racecraft.healing_juice.name",
-                    "ability.racecraft.healing_juice.desc", 300, 0, 11, 1);
+                    "ability.racecraft.healing_juice.desc", 1200, 0, 11, 1);
         }
         @Override
         public void execute(Player player, Level level) {
-            var pos = player.blockPosition();
-            var block = level.getBlockState(pos).getBlock();
-            var below = level.getBlockState(pos.below()).getBlock();
-            if (block instanceof LeavesBlock || below instanceof GrassBlock || below == net.minecraft.world.level.block.Blocks.DIRT) {
-                player.heal(4f);
-                // Лечим союзников рядом
-                AABB box = player.getBoundingBox().inflate(5);
-                level.getEntitiesOfClass(Player.class, box)
-                        .forEach(ally -> ally.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 100, 1)));
-                notifyActivation(player, "§aЦелебный сок — лечение!");
-            } else {
-                notifyActivation(player, "§cВстань на траву или под листья!");
-            }
+            if (!consumeHunger(player, 1)) return;
+            float heal = (6f + getAccessoryLevel(player)) * getDurationMultiplier(player);
+            player.heal(heal);
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 0));
+            player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 100, 0));
+            notifyActivation(player, "§2Целебный сок! +" + (int) heal + "♥ + реген.");
         }
     }
 
-    // 2. Корневая связь — усиление роста в зоне
+    /** 11.3 Корневая связь — привязка врага на 10 сек (200t, 1 голод) */
     public static class RootBond extends AbstractAbility {
         public RootBond() {
             super(id("root_bond"), "ability.racecraft.root_bond.name",
-                    "ability.racecraft.root_bond.desc", 600, 0, 11, 2);
+                    "ability.racecraft.root_bond.desc", 200, 0, 11, 2);
         }
         @Override
         public void execute(Player player, Level level) {
-            var center = player.blockPosition();
-            for (int x = -5; x <= 5; x++) for (int z = -5; z <= 5; z++) {
-                var pos = center.offset(x, 0, z);
-                BlockState state = level.getBlockState(pos);
-                if (state.getBlock() instanceof CropBlock crop && !crop.isMaxAge(state)) {
-                    // Боунмил эффект
-                    level.setBlockAndUpdate(pos, crop.getStateForAge(
-                            Math.min(crop.getMaxAge(), crop.getAge(state) + 2)));
-                }
-            }
-            notifyActivation(player, "§aКорневая связь — ускоренный рост!");
+            if (!consumeHunger(player, 1)) return;
+            AABB box = player.getBoundingBox().inflate(8);
+            var targets = level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player);
+            if (targets.isEmpty()) { notifyActivation(player, "§cНет врагов в 8 блоках!"); return; }
+            int dur = (int)(200 * getDurationMultiplier(player));
+            targets.stream()
+                    .min(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(player)))
+                    .ifPresent(e -> {
+                        e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, dur, 127));
+                        e.addEffect(new MobEffectInstance(MobEffects.JUMP, dur, -10));
+                    });
+            notifyActivation(player, "§2Корневая связь! Враг обездвижен на 10 сек.");
         }
     }
 
-    // 3. Природная броня — листовая броня (Ветка A)
+    /** 11.4 Броня природы — листья снижают урон 15 сек (500t, 1 голод) */
     public static class NatureArmor extends AbstractAbility {
         public NatureArmor() {
             super(id("nature_armor"), "ability.racecraft.nature_armor.name",
-                    "ability.racecraft.nature_armor.desc", 400, 20, 11, 3);
+                    "ability.racecraft.nature_armor.desc", 500, 20, 11, 3);
         }
         @Override
         public void execute(Player player, Level level) {
-            float dur = 400 * getDurationMultiplier(player);
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, (int) dur, 1));
-            // Urон отражается вручную в RaceEventHandler — здесь помечаем как активный
-            player.getPersistentData().putLong("nature_armor_expire", player.level().getGameTime() + (long) dur);
-            notifyActivation(player, "§aПриродная броня +4 брони!");
+            if (!consumeHunger(player, 1)) return;
+            int dur = (int)(300 * getDurationMultiplier(player));
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, dur, 1));
+            player.getPersistentData().putLong("nature_armor_expire", level.getGameTime() + dur);
+            notifyActivation(player, "§2Броня природы! Защита + шипы 15 сек.");
         }
     }
 
-    // 4. Фотосинтез — реген на солнце (Ветка A)
+    /** 11.5 Фотосинтез — пассив: реген HP на солнце (0t, пассив) */
     public static class Photosynthesis extends AbstractAbility {
         public Photosynthesis() {
             super(id("photosynthesis"), "ability.racecraft.photosynthesis.name",
-                    "ability.racecraft.photosynthesis.desc", 600, 20, 11, 4);
+                    "ability.racecraft.photosynthesis.desc", 0, 20, 11, 4);
         }
         @Override
         public void execute(Player player, Level level) {
-            if (level.isDay() && level.canSeeSky(player.blockPosition())) {
-                float dur = 400 * getDurationMultiplier(player);
-                player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, (int) dur, 1));
-                player.getFoodData().eat(6, 1f);
-                notifyActivation(player, "§aФотосинтез — реген и еда!");
-            } else {
-                notifyActivation(player, "§cНужен солнечный свет!");
-            }
+            notifyActivation(player, "§2Фотосинтез: пассивный реген HP на солнце активен.");
         }
     }
 
-    // 5. Обмен веществ — мясо → костная мука (Ветка B)
-    public static class MetabolismGardener extends AbstractAbility {
-        public MetabolismGardener() {
-            super(id("metabolism_gardener"), "ability.racecraft.metabolism_gardener.name",
-                    "ability.racecraft.metabolism_gardener.desc", 60, 20, 11, 5);
+    /** 11.6 Метаболизм — поедание мяса +6♥ (40t, 1 мясо) */
+    public static class Metabolism extends AbstractAbility {
+        public Metabolism() {
+            super(id("gardener_metabolism"), "ability.racecraft.gardener_metabolism.name",
+                    "ability.racecraft.gardener_metabolism.desc", 40, 20, 11, 5);
         }
         @Override
         public void execute(Player player, Level level) {
-            int converted = 0;
+            // Ищем любое мясо
             for (int i = 0; i < 36; i++) {
                 ItemStack stack = player.getInventory().getItem(i);
-                if (stack.is(net.minecraft.world.item.Items.ROTTEN_FLESH) ||
-                        stack.is(net.minecraft.world.item.Items.BEEF) ||
-                        stack.is(net.minecraft.world.item.Items.PORKCHOP)) {
-                    int count = stack.getCount();
-                    player.getInventory().setItem(i, ItemStack.EMPTY);
-                    player.addItem(new ItemStack(Items.BONE_MEAL, count));
-                    converted += count;
+                if (stack.is(Items.COOKED_BEEF) || stack.is(Items.COOKED_CHICKEN)
+                        || stack.is(Items.COOKED_PORKCHOP) || stack.is(Items.COOKED_MUTTON)
+                        || stack.is(Items.COOKED_SALMON) || stack.is(Items.BEEF)
+                        || stack.is(Items.CHICKEN) || stack.is(Items.PORKCHOP)) {
+                    stack.shrink(1);
+                    float heal = (6f + getAccessoryLevel(player) * 0.5f) * getDurationMultiplier(player);
+                    player.heal(heal);
+                    player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0));
+                    notifyActivation(player, "§2Метаболизм! +" + (int) heal + "♥ из мяса.");
+                    return;
                 }
             }
-            if (converted > 0) {
-                notifyActivation(player, "§aОбмен веществ: " + converted + " мяса → костная мука!");
-            } else {
-                notifyActivation(player, "§cМяса не найдено в инвентаре.");
-            }
+            notifyActivation(player, "§cНет мяса в инвентаре!");
         }
     }
 
-    // 6. Цветочный дождь — дождь из цветов, рост (Ветка B)
+    /** 11.7 Цветочный дождь — 5 цветков → исцеление союзников (2400t, 2 голода + 5 цветков) */
     public static class FlowerRain extends AbstractAbility {
         public FlowerRain() {
             super(id("flower_rain"), "ability.racecraft.flower_rain.name",
-                    "ability.racecraft.flower_rain.desc", 800, 20, 11, 6);
+                    "ability.racecraft.flower_rain.desc", 2400, 20, 11, 6);
         }
         @Override
         public void execute(Player player, Level level) {
-            GrowthBlessing gb = new GrowthBlessing();
-            gb.execute(player, level);
-            player.addEffect(new MobEffectInstance(MobEffects.LUCK, 400, 1));
-            notifyActivation(player, "§aЦветочный дождь — мгновенный рост!");
+            if (!consumeHunger(player, 2)) return;
+            // Нужно 5 любых цветков
+            int flowers = 0;
+            for (int i = 0; i < 36 && flowers < 5; i++) {
+                ItemStack s = player.getInventory().getItem(i);
+                if (s.is(Items.DANDELION) || s.is(Items.POPPY) || s.is(Items.BLUE_ORCHID)
+                        || s.is(Items.ALLIUM) || s.is(Items.OXEYE_DAISY) || s.is(Items.CORNFLOWER)
+                        || s.is(Items.SUNFLOWER) || s.is(Items.AZURE_BLUET)) {
+                    int take = Math.min(5 - flowers, s.getCount());
+                    s.shrink(take);
+                    flowers += take;
+                }
+            }
+            if (flowers < 5) { notifyActivation(player, "§cНужно 5 цветков!"); return; }
+            float heal = (8f + getAccessoryLevel(player)) * getDurationMultiplier(player);
+            AABB box = player.getBoundingBox().inflate(15);
+            level.getEntitiesOfClass(Player.class, box)
+                    .forEach(p -> p.heal(heal));
+            notifyActivation(player, "§2Цветочный дождь! Все игроки в 15 блоках +" + (int) heal + "♥.");
         }
     }
 
-    // 7. Оплетение — замедление и урон врагам (Tier 3)
+    /** 11.8 Опутывание — корни 5 блоков, АоЕ (600t, 1 голод) */
     public static class Entangle extends AbstractAbility {
         public Entangle() {
             super(id("entangle"), "ability.racecraft.entangle.name",
@@ -191,15 +202,23 @@ public class GardenerSymbiontAbilities {
         }
         @Override
         public void execute(Player player, Level level) {
-            float dur = 200 * getDurationMultiplier(player);
-            float dmg = 2f * getDamageMultiplier(player);
-            AABB box = player.getBoundingBox().inflate(5);
+            if (!consumeHunger(player, 1)) return;
+            float radius = 5f * (1f + getAccessoryLevel(player) * 0.05f);
+            int dur = (int)(200 * getDurationMultiplier(player));
+            float dmg = 3f * getDamageMultiplier(player);
+            AABB box = player.getBoundingBox().inflate(radius);
             level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player)
                     .forEach(e -> {
-                        e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, (int) dur, 3));
                         e.hurt(player.damageSources().playerAttack(player), dmg);
+                        e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, dur, 127));
+                        e.addEffect(new MobEffectInstance(MobEffects.JUMP, dur, -10));
+                        e.addEffect(new MobEffectInstance(MobEffects.WITHER, 60, 0));
                     });
-            notifyActivation(player, "§aОплетение — враги опутаны!");
+            notifyActivation(player, "§2Опутывание! Враги скованы в " + (int) radius + " блоках.");
         }
+    }
+
+    private static int getAccessoryLevel(Player player) {
+        return player.getData(com.eternity.races.common.registry.ModAttachments.RACE_DATA.get()).getAccessoryLevel();
     }
 }
