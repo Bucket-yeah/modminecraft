@@ -36,15 +36,12 @@ public record UnlockAbilityPacket(int abilityIndex, int branchChoice) implements
             int tier = AbilityManager.getTierForIndex(data.getRaceId(), pkt.abilityIndex);
             int cost = AbilityManager.getCostForIndex(data.getRaceId(), pkt.abilityIndex);
 
-            // Проверяем пороговые требования
+            // Проверяем пороговые требования для Tier 3
+            // Tier 2 даёт 4 × 20 = 80 очков максимум, Tier 3 требует 60 потраченных
             int totalSpent = 0;
             for (int sp : data.getSpentPoints()) totalSpent += sp;
-            if (tier == 2 && totalSpent < 0) {
-                player.sendSystemMessage(Component.literal("§cНужно ещё очков для Tier 2!"));
-                return;
-            }
-            if (tier == 3 && totalSpent < 100) {
-                player.sendSystemMessage(Component.literal("§cНужно 100 потраченных очков для Tier 3!"));
+            if (tier == 3 && totalSpent < 60) {
+                player.sendSystemMessage(Component.literal("§cНужно потратить 60+ очков на Tier 2 для разблокировки Tier 3!"));
                 return;
             }
 

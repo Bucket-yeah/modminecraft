@@ -128,18 +128,15 @@ public class ProgressionTreeScreen extends Screen {
     }
 
     private void onNodeClick(int abilityIndex) {
-        int tier = AbilityManager.getTierForIndex(raceId, abilityIndex);
         int branch = AbilityManager.getBranchForIndex(raceId, abilityIndex);
         PacketDistributor.sendToServer(new UnlockAbilityPacket(abilityIndex, branch));
-        // Перестраиваем виджеты после отправки пакета
-        this.clearWidgets();
-        this.init();
+        // rebuildWidgets — правильный способ перестройки в 1.21.1 (clearWidgets + init)
+        this.rebuildWidgets();
     }
 
     private void onResetPoints() {
         PacketDistributor.sendToServer(new ResetPointsPacket());
-        this.clearWidgets();
-        this.init();
+        this.rebuildWidgets();
     }
 
     @Override

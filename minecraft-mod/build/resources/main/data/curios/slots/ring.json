@@ -1,7 +1,9 @@
 {
   "size": 1,
   "operation": "SET",
-  "icon": "curios:slot/empty_curios_slot",
+  "order": 160,
+  "icon": "curios:slot/empty_ring_slot",
   "add_cosmetic_slot": false,
+  "validators": ["curios:tag"],
   "render_helpers": []
 }

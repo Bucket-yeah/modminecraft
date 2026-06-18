@@ -87,7 +87,8 @@ public class RaceRingItem extends Item implements ICurioItem {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
-        // Данные расы только с клиентской стороны
+        // Данные расы только с клиентской стороны — Minecraft.getInstance() недоступен на сервере
+        if (!net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) return;
         if (context.level() == null) return;
         Player player = net.minecraft.client.Minecraft.getInstance().player;
         if (player == null) return;
