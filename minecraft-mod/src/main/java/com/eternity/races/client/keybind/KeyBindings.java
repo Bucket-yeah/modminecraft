@@ -2,6 +2,7 @@ package com.eternity.races.client.keybind;
 
 import com.eternity.races.RacesMod;
 import com.eternity.races.common.network.AbilityActivationPacket;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
@@ -45,7 +46,7 @@ public class KeyBindings {
         KEY_OPEN_TREE = new KeyMapping(
                 "key." + RacesMod.MOD_ID + ".open_tree",
                 KeyConflictContext.IN_GAME,
-                GLFW.GLFW_KEY_G,
+                InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_G),
                 CATEGORY
         );
         event.register(KEY_OPEN_TREE);
@@ -54,7 +55,7 @@ public class KeyBindings {
             ABILITY_KEYS[i] = new KeyMapping(
                     "key." + RacesMod.MOD_ID + ".ability_" + (i + 1),
                     KeyConflictContext.IN_GAME,
-                    DEFAULT_KEYS[i],
+                    InputConstants.Type.KEYSYM.getOrCreate(DEFAULT_KEYS[i]),
                     CATEGORY
             );
             event.register(ABILITY_KEYS[i]);

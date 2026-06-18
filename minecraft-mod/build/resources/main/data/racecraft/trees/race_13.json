@@ -1,0 +1,28 @@
+{
+  "race_id": 13,
+  "race_name": "Редстоун-Инженер",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["signal_boost", "temp_wire", "jammer"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Анализ",
+        "cost_per_ability": 20,
+        "abilities": ["circuit_scan", "quick_repair"]
+      },
+      "branch_b": {
+        "name": "Энергия",
+        "cost_per_ability": 20,
+        "abilities": ["energy_burst", "circuit_copy"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["redstone_sensor"]
+  }
+}

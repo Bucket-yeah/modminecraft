@@ -70,7 +70,7 @@ public class GardenerSymbiontAbilities {
             var pos = player.blockPosition();
             var block = level.getBlockState(pos).getBlock();
             var below = level.getBlockState(pos.below()).getBlock();
-            if (block instanceof LeavesBlock || below instanceof GrassBlock || below instanceof DirtBlock) {
+            if (block instanceof LeavesBlock || below instanceof GrassBlock || below == net.minecraft.world.level.block.Blocks.DIRT) {
                 player.heal(4f);
                 // Лечим союзников рядом
                 AABB box = player.getBoundingBox().inflate(5);

@@ -1,0 +1,20 @@
+{
+  "replace": false,
+  "values": [
+    "racecraft:ring_echo_golem",
+    "racecraft:ring_mnemo_engineer",
+    "racecraft:ring_chimera_symbiont",
+    "racecraft:ring_dimension_weaver",
+    "racecraft:ring_kinetic_pyromancer",
+    "racecraft:ring_lunar_reaper",
+    "racecraft:ring_gravity_weaver",
+    "racecraft:ring_entropy_destroyer",
+    "racecraft:ring_shadow_diplomat",
+    "racecraft:ring_alchemist_transmutor",
+    "racecraft:ring_gardener_symbiont",
+    "racecraft:ring_wanderer_cartographer",
+    "racecraft:ring_redstone_engineer",
+    "racecraft:ring_mercantile_mage",
+    "racecraft:ring_deep_gnome"
+  ]
+}

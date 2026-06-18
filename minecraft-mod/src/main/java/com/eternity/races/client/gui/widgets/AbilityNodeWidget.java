@@ -73,13 +73,14 @@ public class AbilityNodeWidget extends AbstractWidget {
         if (isHovered()) {
             g.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), 0x33FFFFFF);
             // Тултип с полным описанием
-            g.renderTooltip(font,
-                    java.util.List.of(
-                            Component.literal("§e" + shortName),
-                            Component.literal("§7Стоимость: §6" + ability.unlockCost + " очков"),
-                            Component.literal(unlocked ? "§aРазблокировано" :
-                                    (purchasable ? "§eДоступно для покупки" : "§cЗаблокировано"))
-                    ), mx, my);
+            java.util.List<net.minecraft.util.FormattedCharSequence> tooltip = java.util.List.of(
+                    Component.literal("§e" + shortName),
+                    Component.literal("§7Стоимость: §6" + ability.unlockCost + " очков"),
+                    Component.literal(unlocked ? "§aРазблокировано" :
+                            (purchasable ? "§eДоступно для покупки" : "§cЗаблокировано"))
+            ).stream().map(net.minecraft.network.chat.Component::getVisualOrderText)
+                    .collect(java.util.stream.Collectors.toList());
+            g.renderTooltip(font, tooltip, mx, my);
         }
     }
 

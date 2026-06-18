@@ -44,7 +44,7 @@ public class ChimeraSymbiontAbilities {
         @Override
         public void execute(Player player, Level level) {
             AABB box = player.getBoundingBox().inflate(5);
-            var mobs = level.getEntitiesOfClass(Mob.class, box, e -> e != player && !(e instanceof Monster m && m.getTarget() == player));
+            var mobs = level.getEntitiesOfClass(Mob.class, box, e -> !player.is(e) && !(e instanceof Monster m && player.is(m.getTarget())));
             if (mobs.isEmpty()) {
                 notifyActivation(player, "§cНет подходящих мобов рядом!");
                 return;

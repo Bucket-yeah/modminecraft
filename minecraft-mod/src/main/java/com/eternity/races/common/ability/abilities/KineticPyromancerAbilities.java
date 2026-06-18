@@ -58,7 +58,7 @@ public class KineticPyromancerAbilities {
         public void execute(Player player, Level level) {
             Vec3 look = player.getLookAngle();
             var fireball = new net.minecraft.world.entity.projectile.SmallFireball(level, player,
-                    look.x * 1.5, look.y * 1.5, look.z * 1.5);
+                    look.scale(1.5));
             fireball.setPos(player.getX() + look.x * 2, player.getY() + 1.5, player.getZ() + look.z * 2);
             level.addFreshEntity(fireball);
             notifyActivation(player, "§6Искра!");
@@ -90,10 +90,9 @@ public class KineticPyromancerAbilities {
         @Override
         public void execute(Player player, Level level) {
             double speed = player.getDeltaMovement().horizontalDistance();
-            float damage = (float) (speed * 10 * getDamageMultiplier(player));
-            damage = Math.max(2f, Math.min(damage, 20f));
+            final float damage = Math.max(2f, Math.min((float) (speed * 10 * getDamageMultiplier(player)), 20f));
             AABB box = player.getBoundingBox().inflate(2).inflate(0, 1, 0);
-            level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player)
+            level.getEntitiesOfClass(LivingEntity.class, box, e -> !player.is(e))
                     .forEach(e -> e.hurt(player.damageSources().playerAttack(player), damage));
             notifyActivation(player, "§6Кинетический удар! Урон: " + (int) damage);
         }

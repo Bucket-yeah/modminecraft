@@ -1,0 +1,28 @@
+{
+  "race_id": 4,
+  "race_name": "Ткач Измерений",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["block_swap", "rift", "teleport_anchor"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Контроль",
+        "cost_per_ability": 20,
+        "abilities": ["compression", "bend"]
+      },
+      "branch_b": {
+        "name": "Пространство",
+        "cost_per_ability": 20,
+        "abilities": ["pocket_dimension", "spatial_blast"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["space_warp"]
+  }
+}

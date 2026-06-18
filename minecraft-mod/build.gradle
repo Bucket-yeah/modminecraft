@@ -51,33 +51,13 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    maven {
-        name = 'Curios'
-        url = 'https://maven.theillusivec4.top/'
-    }
-    maven {
-        name = 'GeckoLib'
-        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
-    }
-    maven {
-        name = 'SmartBrainLib'
-        url = 'https://maven.tslat.net/'
-    }
-    maven {
-        name = 'YACL'
-        url = 'https://maven.isxander.dev/releases'
-    }
-    maven {
-        name = 'BlameJared (Crafttweaker / Jei)'
-        url = 'https://maven.blamejared.com'
+    flatDir {
+        dirs 'libs'
     }
 }
 
 dependencies {
-    implementation "top.theillusivec4.curios:curios-neoforge:${curios_version}"
-    implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:${geckolib_version}"
-    implementation "net.tslat.smartbrainlib:SmartBrainLib-neoforge-1.21.1:${smartbrainlib_version}"
-    implementation "dev.isxander:yet-another-config-lib:${yacl_version}"
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 tasks.withType(ProcessResources).configureEach {

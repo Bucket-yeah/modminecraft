@@ -1,0 +1,28 @@
+{
+  "race_id": 9,
+  "race_name": "Теневой Дипломат",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["command", "fear", "illusion"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Манипуляция",
+        "cost_per_ability": 20,
+        "abilities": ["dark_contract", "gather_info"]
+      },
+      "branch_b": {
+        "name": "Тень",
+        "cost_per_ability": 20,
+        "abilities": ["hide_in_darkness", "mass_hypnosis"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["shadow_sphere"]
+  }
+}

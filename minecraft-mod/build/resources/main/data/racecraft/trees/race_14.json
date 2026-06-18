@@ -1,0 +1,28 @@
+{
+  "race_id": 14,
+  "race_name": "Меркантильный Маг",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["item_alchemy", "villager_upgrade", "currency_exchange"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Торговля",
+        "cost_per_ability": 20,
+        "abilities": ["trade_impulse", "resource_attraction"]
+      },
+      "branch_b": {
+        "name": "Ресурсы",
+        "cost_per_ability": 20,
+        "abilities": ["junk_recycling", "protective_deal"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["barter"]
+  }
+}

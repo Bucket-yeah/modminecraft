@@ -1,0 +1,28 @@
+{
+  "race_id": 15,
+  "race_name": "Глубинный Гном",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["pickaxe_throw", "tunnel_dig", "gnome_echolocation"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Броня",
+        "cost_per_ability": 20,
+        "abilities": ["stone_skin", "tunnel_dash"]
+      },
+      "branch_b": {
+        "name": "Разведка",
+        "cost_per_ability": 20,
+        "abilities": ["danger_sense", "underground_alliance"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["stalagmite"]
+  }
+}

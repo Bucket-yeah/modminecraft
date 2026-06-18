@@ -1,0 +1,28 @@
+{
+  "race_id": 3,
+  "race_name": "Химера-Симбионт",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["possess_mob", "block_possession", "parasitic_touch"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Симбиоз",
+        "cost_per_ability": 20,
+        "abilities": ["colony", "evolution"]
+      },
+      "branch_b": {
+        "name": "Доминация",
+        "cost_per_ability": 20,
+        "abilities": ["reproduction", "aliens_form"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["absorption"]
+  }
+}

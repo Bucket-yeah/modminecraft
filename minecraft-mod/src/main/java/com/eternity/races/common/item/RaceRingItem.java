@@ -39,7 +39,7 @@ public class RaceRingItem extends Item implements ICurioItem {
     // ─── Curios интерфейс ────────────────────────────────────────────────────
 
     @Override
-    public void onEquip(SlotContext slotContext, ItemStack prevStack) {
+    public void onEquip(SlotContext slotContext, ItemStack prevStack, ItemStack currentStack) {
         LivingEntity entity = slotContext.entity();
         if (!(entity instanceof ServerPlayer player)) return;
 
@@ -62,7 +62,7 @@ public class RaceRingItem extends Item implements ICurioItem {
     }
 
     @Override
-    public void onUnequip(SlotContext slotContext, ItemStack newStack) {
+    public void onUnequip(SlotContext slotContext, ItemStack newStack, ItemStack currentStack) {
         // Кольцо расы нельзя снять после выбора расы
         LivingEntity entity = slotContext.entity();
         if (!(entity instanceof ServerPlayer player)) return;
@@ -74,7 +74,7 @@ public class RaceRingItem extends Item implements ICurioItem {
     }
 
     @Override
-    public boolean canEquip(SlotContext slotContext) {
+    public boolean canEquip(SlotContext slotContext, ItemStack currentStack) {
         LivingEntity entity = slotContext.entity();
         if (!(entity instanceof Player player)) return true;
         RaceData data = player.getData(ModAttachments.RACE_DATA.get());

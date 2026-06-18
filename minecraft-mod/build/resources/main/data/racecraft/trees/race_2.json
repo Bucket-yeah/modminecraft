@@ -1,0 +1,28 @@
+{
+  "race_id": 2,
+  "race_name": "Мнемо-Инженер",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["save_point", "rewind", "oblivion"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Контроль",
+        "cost_per_ability": 20,
+        "abilities": ["block_reverse", "imitation"]
+      },
+      "branch_b": {
+        "name": "Хаос",
+        "cost_per_ability": 20,
+        "abilities": ["time_loop", "inventory_reset"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["cognitive_overload"]
+  }
+}

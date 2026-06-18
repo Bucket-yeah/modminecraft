@@ -1,2 +1,3 @@
 - [NeoForge 1.21.1 MobEffects API](neoforge-1211-mobeffects.md) — несколько эффектов переименованы или отсутствуют в 1.21.1
 - [NeoForge 1.21.1 Registration patterns](neoforge-1211-registration.md) — порядок регистрации entity, attributes, reload listeners
+- [NeoForge 1.21.1 API Breaking Changes](neoforge-1211-breaking.md) — сводка всех breaking changes, исправленных при сборке мода

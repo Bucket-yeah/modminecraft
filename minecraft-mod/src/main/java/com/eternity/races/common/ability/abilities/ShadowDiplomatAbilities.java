@@ -40,7 +40,7 @@ public class ShadowDiplomatAbilities {
         @Override
         public void execute(Player player, Level level) {
             AABB box = player.getBoundingBox().inflate(8);
-            level.getEntitiesOfClass(Mob.class, box, e -> e != player).stream().findFirst()
+            level.getEntitiesOfClass(Mob.class, box, e -> !player.is(e)).stream().findFirst()
                     .ifPresent(mob -> {
                         mob.setTarget(null);
                         mob.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 600, 0));
@@ -61,7 +61,7 @@ public class ShadowDiplomatAbilities {
         public void execute(Player player, Level level) {
             float dur = 100 * getDurationMultiplier(player);
             AABB box = player.getBoundingBox().inflate(8);
-            level.getEntitiesOfClass(Mob.class, box, e -> e != player)
+            level.getEntitiesOfClass(Mob.class, box, e -> !player.is(e))
                     .forEach(mob -> {
                         mob.addEffect(new MobEffectInstance(MobEffects.CONFUSION, (int) dur, 0));
                         mob.setTarget(null);
@@ -102,7 +102,7 @@ public class ShadowDiplomatAbilities {
         @Override
         public void execute(Player player, Level level) {
             AABB box = player.getBoundingBox().inflate(8);
-            level.getEntitiesOfClass(Mob.class, box, e -> e != player).stream().findFirst()
+            level.getEntitiesOfClass(Mob.class, box, e -> !player.is(e)).stream().findFirst()
                     .ifPresent(mob -> {
                         // Меняем местами позиции
                         double px = player.getX(), py = player.getY(), pz = player.getZ();
@@ -155,7 +155,7 @@ public class ShadowDiplomatAbilities {
         public void execute(Player player, Level level) {
             float dur = 160 * getDurationMultiplier(player);
             AABB box = player.getBoundingBox().inflate(12);
-            level.getEntitiesOfClass(Mob.class, box, e -> e != player)
+            level.getEntitiesOfClass(Mob.class, box, e -> !player.is(e))
                     .forEach(mob -> {
                         mob.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, (int) dur, 127));
                         mob.setTarget(null);

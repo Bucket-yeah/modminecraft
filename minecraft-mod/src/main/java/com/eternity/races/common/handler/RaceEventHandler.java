@@ -196,7 +196,8 @@ public class RaceEventHandler {
     // ── Раса 3: Химера-Симбионт ──────────────────────────────────────────────
     private static void tickChimeraSymbiont(Player p, RaceData d, long tick) {
         // Реген вне боя
-        if (tick % 100 == 0 && !p.getCombatTracker().inCombat() && p.getHealth() < p.getMaxHealth()) {
+        boolean notInCombat = p.getLastHurtByMob() == null || (p.tickCount - p.getLastHurtByMobTimestamp()) > 100;
+        if (tick % 100 == 0 && notInCombat && p.getHealth() < p.getMaxHealth()) {
             p.heal(1f);
         }
         // Штраф: голод < 3 → урон
@@ -278,7 +279,7 @@ public class RaceEventHandler {
     private static void tickShadowDiplomat(Player p, RaceData d, long tick) {
         // Невидимость для мобов без брони и без атаки
         boolean hasArmor = !p.getInventory().armor.stream().allMatch(ItemStack::isEmpty);
-        boolean inCombat = p.getCombatTracker().inCombat();
+        boolean inCombat = p.getLastHurtByMob() != null && (p.tickCount - p.getLastHurtByMobTimestamp()) <= 100;
         if (!hasArmor && !inCombat) {
             // Снимаем агро ближайших мобов
             if (tick % 40 == 0) {

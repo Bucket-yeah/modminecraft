@@ -1,0 +1,28 @@
+{
+  "race_id": 11,
+  "race_name": "Садовник-Симбиот",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["growth_blessing", "healing_juice", "root_bond"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Природа",
+        "cost_per_ability": 20,
+        "abilities": ["nature_armor", "photosynthesis"]
+      },
+      "branch_b": {
+        "name": "Симбиоз",
+        "cost_per_ability": 20,
+        "abilities": ["metabolism_gardener", "flower_rain"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["entangle"]
+  }
+}

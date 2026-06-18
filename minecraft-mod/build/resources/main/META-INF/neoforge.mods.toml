@@ -1,0 +1,54 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="racecraft"
+version="1.0.0"
+displayName="EternityRaces"
+description='''Adds 15 playable races with unique abilities, passive traits, and progression trees.'''
+
+[[mixins]]
+config="racecraft.mixins.json"
+
+[[dependencies.racecraft]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.racecraft]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1,1.22)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.racecraft]]
+    modId="curios"
+    type="required"
+    versionRange="[7.1,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.racecraft]]
+    modId="geckolib"
+    type="required"
+    versionRange="[4.6,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.racecraft]]
+    modId="smartbrainlib"
+    type="required"
+    versionRange="[1.13,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.racecraft]]
+    modId="yet_another_config_lib"
+    type="required"
+    versionRange="[3.5,)"
+    ordering="NONE"
+    side="BOTH"

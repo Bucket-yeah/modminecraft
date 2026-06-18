@@ -1,0 +1,28 @@
+{
+  "race_id": 10,
+  "race_name": "Алхимик-Трансмутатор",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["transmutation", "hardening", "liquify"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Защита",
+        "cost_per_ability": 20,
+        "abilities": ["alchemy_shield", "metabolism"]
+      },
+      "branch_b": {
+        "name": "Трансформация",
+        "cost_per_ability": 20,
+        "abilities": ["golden_touch", "stabilization"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["synthesis"]
+  }
+}

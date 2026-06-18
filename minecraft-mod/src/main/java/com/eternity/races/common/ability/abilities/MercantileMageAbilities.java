@@ -131,7 +131,7 @@ public class MercantileMageAbilities {
         public void execute(Player player, Level level) {
             AABB box = player.getBoundingBox().inflate(30);
             level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box)
-                    .forEach(item -> item.addEffect(new MobEffectInstance(MobEffects.GLOWING, 200, 0)));
+                    .forEach(item -> item.setGlowingTag(true));
             notifyActivation(player, "§6Привлечение ресурса — предметы подсвечены!");
         }
     }

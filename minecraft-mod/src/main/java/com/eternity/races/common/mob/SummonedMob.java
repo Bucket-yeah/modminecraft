@@ -1,7 +1,8 @@
 package com.eternity.races.common.mob;
 
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -13,7 +14,7 @@ import net.tslat.smartbrainlib.api.core.behaviour.FirstApplicableBehaviour;
 import net.tslat.smartbrainlib.api.core.behaviour.OneRandomBehaviour;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.attack.AnimatableMeleeAttack;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.misc.Idle;
-import net.tslat.smartbrainlib.api.core.behaviour.custom.move.FollowOwner;
+import net.tslat.smartbrainlib.api.core.behaviour.custom.move.FollowEntity;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.move.MoveToWalkTarget;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.path.SetRandomWalkTarget;
 import net.tslat.smartbrainlib.api.core.behaviour.custom.target.InvalidateAttackTarget;
@@ -32,7 +33,7 @@ import java.util.UUID;
  * Базовый класс для всех призванных существ.
  * Использует SmartBrainLib для AI: следует за хозяином, атакует его врагов.
  */
-public abstract class SummonedMob extends Mob implements SmartBrainOwner<SummonedMob> {
+public abstract class SummonedMob extends PathfinderMob implements SmartBrainOwner<SummonedMob> {
 
     private UUID ownerUUID;
     private int lifetimeTicks;
@@ -43,7 +44,7 @@ public abstract class SummonedMob extends Mob implements SmartBrainOwner<Summone
     }
 
     public static AttributeSupplier.Builder createAttributes() {
-        return Mob.createMobAttributes()
+        return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.35)
                 .add(Attributes.ATTACK_DAMAGE, 4.0)
@@ -69,7 +70,10 @@ public abstract class SummonedMob extends Mob implements SmartBrainOwner<Summone
     @Override
     public BrainActivityGroup<? extends SummonedMob> getCoreTasks() {
         return BrainActivityGroup.coreTasks(
-                new FollowOwner<>(this::getOwner, 1.2f, 16, 3),
+                new FollowEntity<SummonedMob, LivingEntity>()
+                        .following(e -> e.getOwner())
+                        .teleportToTargetAfter(16.0)
+                        .stopFollowingWithin(3.0),
                 new MoveToWalkTarget<>()
         );
     }

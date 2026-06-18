@@ -1,0 +1,28 @@
+{
+  "race_id": 12,
+  "race_name": "Странник-Картограф",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["save_coords", "teleport_to_point", "biome_analysis"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Движение",
+        "cost_per_ability": 20,
+        "abilities": ["temp_trail", "portal_loop"]
+      },
+      "branch_b": {
+        "name": "Разведка",
+        "cost_per_ability": 20,
+        "abilities": ["intuition", "return"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["orientation"]
+  }
+}

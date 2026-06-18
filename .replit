@@ -24,12 +24,12 @@ args = "Build Mod"
 name = "Build Mod"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd minecraft-mod && gradle build --no-daemon 2>&1 | tee /tmp/gradle-build.log; echo 'BUILD EXIT:' $?"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd minecraft-mod && gradle build --no-daemon 2>&1 | tee /tmp/gradle-build.log; echo 'EXIT:'$?"
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -1,0 +1,28 @@
+{
+  "race_id": 6,
+  "race_name": "Лунный Жнец",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["moonlight", "shadow", "cycle"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Жатва",
+        "cost_per_ability": 20,
+        "abilities": ["soul_reaper", "sleeping_agent"]
+      },
+      "branch_b": {
+        "name": "Луна",
+        "cost_per_ability": 20,
+        "abilities": ["lunar_call", "eclipse"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["lunar_regen"]
+  }
+}
