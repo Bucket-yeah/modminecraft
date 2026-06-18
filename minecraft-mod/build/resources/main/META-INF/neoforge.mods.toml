@@ -46,9 +46,3 @@ config="racecraft.mixins.json"
     ordering="NONE"
     side="BOTH"
 
-[[dependencies.racecraft]]
-    modId="yet_another_config_lib"
-    type="required"
-    versionRange="[3.5,)"
-    ordering="NONE"
-    side="BOTH"
