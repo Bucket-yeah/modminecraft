@@ -1,0 +1,911 @@
+# COMPREHENSIVE TECHNICAL SPECIFICATION
+## Minecraft Mod: "15 Races" (NeoForge 1.21.1)
+
+**Attention:** This document is a **complete, detailed technical specification** for a mod developer (AI or human). Read every section carefully. Do not invent any mechanics, commands, or features not explicitly stated here. All game texts (chat, GUI, book, tooltips) must be in **Russian** unless otherwise noted.
+
+---
+
+## 0. MANDATORY PRE-DEVELOPMENT STEPS
+
+Before writing any code, the developer **MUST**:
+
+1. **Study official documentation** for all libraries:
+   - [NeoForge 1.21.1 Documentation](https://docs.neoforged.net/)
+   - [Curios API](https://docs.curios.neoforged.net/)
+   - [GeckoLib 4.4+](https://geckolib.com/) (for accessory rendering only, no custom models)
+   - [SmartBrainLib](https://github.com/Tslat/SmartBrainLib) (for summoned mob AI)
+   - [YACL (Yet Another Config Library)](https://github.com/AlphaHinex/YACL) (for settings menu)
+
+2. **Triple-check every class, interface, and method**:
+   - Validate all registry names (use `ResourceLocation` with `mod_id:name`).
+   - Ensure all capabilities are attached correctly (CapabilityToken, LazyOptional).
+   - Test all GUI screens (open, render, interactions, keybinds).
+   - Verify all keybinds work and are configurable in settings.
+
+3. **DO NOT use mods, plugins, or libraries not listed above** – only NeoForge and the specified libraries.
+
+4. **All in-game UI text (chat messages, book pages, actionbar messages, titles, tooltips, GUI labels) MUST be in Russian.**
+
+---
+
+## 1. PROJECT OVERVIEW
+
+Create a Minecraft NeoForge mod for **version 1.21.1** that adds **15 playable races**. Each race grants **8 active abilities**, passive traits, and unique penalties that fundamentally change gameplay. The mod must be:
+
+- **Multiplayer-ready** (each player chooses independently via Curios accessory).
+- **Persistent** (selections and progression survive death and world reload).
+- **Configurable** via YACL in-game settings menu.
+- **Performant** (minimal tick overhead, efficient GUI rendering).
+
+---
+
+## 2. TECHNICAL STACK
+
+| Component | Library/Version | Purpose |
+|-----------|-----------------|---------|
+| Mod Loader | NeoForge 1.21.1 | Core mod framework |
+| Accessories | Curios API 1.21.1-7.x.x | Race-selection ring slot |
+| Rendering | GeckoLib 4.4+ | Accessory rendering (static models, no animations) |
+| AI | SmartBrainLib 1.21.1-1.x.x | Summoned mob AI behaviors |
+| Config | YACL 1.21.1-3.x.x | In-game settings menu |
+| Mapping | Parchment 2024.07.14 | Human-readable method/field names |
+
+**Mod ID:** `races_mod` (or custom, e.g., `racecraft`)
+
+---
+
+## 3. ARCHITECTURE
+
+### 3.1. Package Structure
+```
+com.example.races/
+├── RacesMod.java                    # Main mod class (Common, Client, Server)
+├── common/
+│   ├── cap/
+│   │   ├── RaceData.java            # Player race data (ID, points, unlocked abilities, spent points)
+│   │   └── RaceDataProvider.java    # Attaches to Player (Capability)
+│   ├── item/
+│   │   ├── RaceRingItem.java        # Curios ring item (one per race)
+│   │   └── RaceRingRenderer.java    # GeckoLib renderer for ring (optional, uses standard model)
+│   ├── ability/
+│   │   ├── AbilityManager.java      # Registry of all abilities, cooldowns, costs
+│   │   ├── AbstractAbility.java     # Base ability class
+│   │   └── abilities/               # 8 ability classes per race (120 total)
+│   ├── progression/
+│   │   ├── RaceProgressionTree.java # JSON-loaded tree for each race
+│   │   ├── ProgressionNode.java     # Single node (ability + cost + children)
+│   │   └── ProgressionLoader.java   # Loads from data/races/trees/*.json
+│   ├── mob/
+│   │   ├── SummonedMob.java         # Base class for summoned entities
+│   │   ├── SummonedWolf.java        # Lunar Reaper wolves
+│   │   ├── SummonedSpider.java      # Deep Gnome cave spiders
+│   │   ├── SummonedSlime.java       # Chimera-Symbiont slimes
+│   │   └── AI/                      # SmartBrainLib behavior definitions
+│   ├── config/
+│   │   └── RacesConfig.java         # YACL config class
+│   └── network/
+│       └── RacesPackets.java        # Sync race data between client/server
+└── client/
+    ├── gui/
+    │   ├── RaceSelectionScreen.java # GUI for choosing race (book-style? or custom)
+    │   ├── ProgressionTreeScreen.java # GUI for ability tree
+    │   └── widgets/
+    │       └── AbilityNodeWidget.java # Drawn node in tree
+    ├── keybind/
+    │   └── KeyBindings.java          # Keybinds for abilities (1-8) and GUI open
+    └── render/
+        └── RaceRingLayer.java        # Render ring on player model (if needed)
+```
+
+---
+
+## 4. CORE MECHANICS
+
+### 4.1. Race Selection (One-time choice)
+
+**Flow:**
+1. Player joins the world for the first time (or if `race_data` is empty).
+2. A chat message appears:
+   ```
+   §6⚔️ Добро пожаловать в мир Рас! §r
+   §7Выбери свою расу – она определит твой путь.
+   §a📖 Используй книгу «Том рас» (в инвентаре) или нажми §b[Клавиша] §aдля открытия меню выбора.
+   §cВнимание: выбор расы окончателен!
+   ```
+3. Player receives a **written book** titled `"Том рас"` with 6 pages (intro + 15 races).
+4. Clicking `[ВЫБРАТЬ ЭТУ РАСУ]` in the book OR selecting from GUI:
+   - Sets `race_id` in Capability (1-15).
+   - Gives the player their **Race Ring** (Curios accessory).
+   - Removes the selection book (if in inventory).
+   - Locks selection forever (cannot be changed).
+5. **If player tries to select again** (e.g., using book after choice), display:
+   ```
+   §cТы уже выбрал расу! Твой путь предопределён.
+   ```
+
+**Technical implementation:**
+- Use `Capability` attached to `Player` to store:
+  - `int raceId` (0 = none, 1-15 = selected)
+  - `boolean hasChosen` (once true, cannot be changed)
+  - `int racePoints` (current unspent points)
+  - `Map<Integer, Boolean> unlockedAbilities` (ability ID → unlocked)
+  - `Map<Integer, Integer> spentPoints` (ability ID → points invested)
+  - `float accessoryExp` (experience for ring level)
+- Selection triggers **server-side** and syncs to client via custom packet.
+
+---
+
+### 4.2. Race Ring (Curios Accessory)
+
+**Slot:** `curios:ring` (use existing ring slot).  
+**Restriction:** Player can only wear **one** race ring at a time. If they try to equip a second, cancel the equip (or unequip the first).
+
+**Item Properties:**
+- `RaceRingItem` extends `Item` with `ICurioItem` interface.
+- Each race has a separate item (or one item with NBT storing `raceId`).  
+  **Recommendation:** Separate items per race for cleaner registry (e.g., `echo_golem_ring`, `mnemo_engineer_ring`, etc.).
+
+**Tooltip (in Russian):**
+```
+§6Кольцо Эхо-Голема
+§7Уровень: [level]
+§7Опыт: [exp] / [next_level_exp]
+§7Раса: Эхо-Голем
+§7Пассив: звуковая чувствительность
+§7Штраф: глухота, слабость на шерсти
+```
+
+**Leveling:**
+- Each time the player uses an active ability, the ring gains `+1 exp`.
+- Level = `floor(exp / 100)` (e.g., 100 exp = level 1, 200 = level 2, etc.)
+- Max level: 10 (1000 exp).
+- Level affects:
+  - Ability damage: `base_damage * (1 + level * 0.05)` (max +50% at level 10).
+  - Cooldown reduction: `base_cooldown * (1 - level * 0.02)` (max -20% at level 10).
+  - Duration increase: `base_duration * (1 + level * 0.03)` (max +30% at level 10).
+
+**GeckoLib Rendering:**
+- No custom model – use standard Minecraft ring model (or simple 2D overlay).
+- GeckoLib can render a static item model (no animations required). We'll use it for consistency, but it's optional.
+
+---
+
+### 4.3. Race Points System (Progression Currency)
+
+**Name:** `Очки Рас` (Race Points)
+
+#### 4.3.1. Earning Race Points
+
+| Action | Points |
+|--------|--------|
+| Killing any mob (zombie, skeleton, creeper, etc.) | 1 |
+| Killing a "strong" mob (Enderman, Blaze, Wither Skeleton, Piglin Brute) | 3 |
+| Killing a boss (Wither, Ender Dragon) | 50 |
+| Mining 1 stack (64) of a race-specific resource | 1 |
+| Discovering a new structure (village, temple, fortress, stronghold) | 5 |
+| Reaching experience level 30 | 10 |
+| **Race-specific actions** (see per-race bonuses below) | 1-5 |
+
+**Race-specific point bonuses:**
+
+| Race | Bonus Action | Points |
+|------|--------------|--------|
+| Эхо-Голем | Kill a mob using sound damage (ability) | +2 |
+| Мнемо-Инженер | Successfully use "Откат" (Rewind) | +1 |
+| Химера-Симбионт | Kill a mob while possessing another mob | +2 |
+| Ткач Измерений | Teleport over 50 blocks in one use | +2 |
+| Кинетик-Пиромант | Kill a mob while sprinting | +2 |
+| Лунный Жнец | Kill a mob at night | +2 |
+| Грав-Ткач | Kill a mob using "Метеорит" | +3 |
+| Энтропийный Разрушитель | Destroy 10 blocks in 1 second (with "Распад") | +1 |
+| Теневой Дипломат | Control a mob for 30+ seconds | +2 |
+| Алхимик-Трансмутатор | Successfully transmute into diamond | +3 |
+| Садовник-Симбиот | Harvest 10 fully-grown crops at once | +1 |
+| Странник-Картограф | Travel over 1000 blocks from spawn | +2 |
+| Редстоун-Инженер | Activate a redstone circuit with signal strength >10 | +1 |
+| Меркантильный Маг | Complete a trade with a villager | +1 |
+| Глубинный Гном | Kill a mob below Y=40 | +2 |
+
+**Progression speed:** To unlock all abilities (cost ~150-200 points per race), a player needs to kill ~150-200 mobs or complete ~50 race-specific actions. This ensures **long-term progression** (10+ hours of gameplay).
+
+#### 4.3.2. Storing Points
+- Points are stored in the player's Capability: `int racePoints` (unspent).
+- Spent points are tracked per ability: `Map<Integer, Integer> spentPoints`.
+
+#### 4.3.3. Respec (Reset Points)
+- Player can **reset all spent points** (return them to unspent pool) by paying a **race-specific resource**.
+- GUI has a "Сбросить очки" button that opens a confirmation dialog.
+- Resource cost per race (consumed on reset):
+
+| Race | Reset Resource | Amount |
+|------|----------------|--------|
+| Эхо-Голем | Echo Shard (from killing mobs with sound) | 16 |
+| Мнемо-Инженер | Memory Fragment (from chest loot) | 16 |
+| Химера-Симбионт | Chitin (from spiders) | 20 |
+| Ткач Измерений | Ender Pearl | 8 |
+| Кинетик-Пиромант | Blaze Powder | 20 |
+| Лунный Жнец | Phantom Membrane | 12 |
+| Грав-Ткач | Slime Ball | 32 |
+| Энтропийный Разрушитель | Obsidian | 16 |
+| Теневой Дипломат | Ink Sac | 24 |
+| Алхимик-Трансмутатор | Gold Ingot | 16 |
+| Садовник-Симбиот | Bonemeal | 32 |
+| Странник-Картограф | Compass | 4 |
+| Редстоун-Инженер | Redstone Dust | 32 |
+| Меркантильный Маг | Emerald | 8 |
+| Глубинный Гном | Deepslate | 32 |
+
+---
+
+### 4.4. Ability Tree (Progression Tree)
+
+Each race has a **branching ability tree** with 3 tiers and 8 abilities total.
+
+#### 4.4.1. Tree Structure
+
+**Tier 1 (Base) – 0 points required:**
+- 3 abilities (free, unlocked by default)
+
+**Tier 2 (Intermediate) – 50 points required total:**
+- 2 **branches** (A and B), each containing 2 abilities.
+- Player must choose ONE branch and unlock both abilities in that branch.
+- Cost per ability: 20 points.
+- **Total tier cost:** 40 points (if they unlock both abilities in one branch).
+
+**Tier 3 (Advanced) – 120 points required total:**
+- 2 abilities (unlocked automatically after reaching 120 points).
+- Cost per ability: 30 points.
+- **Total tier cost:** 60 points.
+
+**Total cost to unlock all 8 abilities:** 0 + 40 + 60 = 100 points (plus the 120 threshold for Tier 3).
+
+**Visual representation in GUI:**
+```
+[Ability 1] [Ability 2] [Ability 3]   ← Tier 1 (free)
+         ↓            ↓
+    [Branch A]    [Branch B]         ← Tier 2 (50 pts)
+    ↓        ↓    ↓        ↓
+[Abil 4] [Abil 5] [Abil 6] [Abil 7]  ← Tier 2 abilities (20 pts each)
+         ↓            ↓
+    [Ability 8 (Advanced)]           ← Tier 3 (120 pts, 30 pts)
+```
+
+#### 4.4.2. JSON Configuration
+
+Each race has a JSON file in `data/races/trees/<race_id>.json`:
+
+```json
+{
+  "race_id": 1,
+  "tier1": {
+    "abilities": ["sound_burst", "echolocation", "silencer"],
+    "cost": 0
+  },
+  "tier2": {
+    "threshold": 50,
+    "branches": {
+      "branch_a": {
+        "name": "Звуковая атака",
+        "abilities": ["seismic_jump", "resonance"],
+        "cost_per_ability": 20
+      },
+      "branch_b": {
+        "name": "Защита",
+        "abilities": ["vibration_shield", "sonic_breach"],
+        "cost_per_ability": 20
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 120,
+    "abilities": ["acoustic_accelerator", "sound_burst_enhanced"],
+    "cost_per_ability": 30
+  }
+}
+```
+
+#### 4.4.3. Ability Unlock Logic
+- Player must have **unspent points** to purchase an ability.
+- Clicking an ability in GUI:
+  - If not enough points: show `§cНедостаточно очков! Нужно: [cost]`
+  - If unlocked: show `§aУже изучено!`
+  - If branch requires other branch: show `§cВыбери ветку [A/B]!`
+- When purchased:
+  - Deduct points from `racePoints`.
+  - Set `unlockedAbilities.put(abilityId, true)`.
+  - Add ability to player's active ability list.
+
+---
+
+### 4.5. Abilities (8 per race)
+
+Each ability is a **Java class** extending `AbstractAbility`.
+
+**AbstractAbility.java:**
+```java
+public abstract class AbstractAbility {
+    public final ResourceLocation id;
+    public final String translationKey; // for GUI text
+    public final int cooldownTicks;
+    public final int baseCost; // hunger, health, etc.
+    public final int levelScaling; // how much level increases effect
+
+    public abstract void execute(Player player, Level level);
+
+    public boolean canUse(Player player) {
+        // Check race, cooldown, cost, etc.
+    }
+
+    public int getCooldown(Player player) {
+        // Apply ring level reduction
+    }
+}
+```
+
+**Per-race ability classes** are instantiated and registered in `AbilityManager`.
+
+#### 4.5.1. Ability Activation (Keybinds)
+- **8 keybinds** (configurable in settings): `Ability 1` through `Ability 8`.
+- Pressing a key activates the corresponding ability (if unlocked and off cooldown).
+- Client sends packet to server to execute the ability.
+- Server validates and runs `execute()`.
+
+**Keybind default suggestions:**
+- `G` – open progression tree GUI.
+- `1-8` (or `R`, `F`, `C`, etc.) – activate abilities 1-8.
+
+**Settings screen (YACL) allows rebinding all keys.**
+
+---
+
+### 4.6. GUI: Progression Tree
+
+**Access:** Press keybind (default `G`) or click button in inventory screen.
+
+**Screen components:**
+- Title: `§6Дерево способностей - [Название расы]`
+- Display all abilities in tree layout (Tier 1, Tier 2 branches, Tier 3).
+- Each ability node:
+  - `§a[✓]` if unlocked.
+  - `§c[X]` if locked (show cost).
+  - `§e[+]` if purchasable (clickable).
+- Current unspent points: `§6Очки: [amount]`
+- Reset button: `§cСбросить очки` (opens confirmation dialog with resource cost).
+- Branch selection: if player hasn't chosen a branch, show both branches as clickable options.
+
+**Interaction:**
+- Click on purchasable ability → purchase (if enough points).
+- Click on branch → select branch (locks the other branch).
+
+**Technical:** Extend `Screen` with custom rendering (using `DrawContext`). Widgets are `AbstractWidget` subclasses.
+
+---
+
+### 4.7. GUI: Race Selection (First Join)
+
+**Alternative to book:** Provide a full-screen GUI that opens on first join (or when player presses a button in inventory).
+
+**Access:** Book `"Том рас"` opens this GUI instead of being a written book (easier to render rich content).
+
+**Screen components:**
+- Grid of 15 race icons (16x16 textures).
+- Clicking a race opens a detail panel with:
+  - Description (from lang file).
+  - List of abilities (tier 1 preview).
+  - Penalties.
+  - `[ВЫБРАТЬ]` button (confirmation dialog).
+- After selection, screen closes and player receives ring.
+
+**Data source:** Race data loaded from JSON (same as tree config).
+
+---
+
+### 4.8. Summoned Mobs (SmartBrainLib)
+
+**Entities created by abilities:**
+- Лунный Жнец → `SummonedWolf` (2 wolves).
+- Химера-Симбионт → `SummonedSlime` (3 small slimes).
+- Глубинный Гном → `SummonedSpider` (cave spider).
+- Теневой Дипломат → controlled mobs (reuse existing AI? or use SmartBrainLib for controlled mobs).
+
+**For controlled mobs (Теневой Дипломат):**
+- When possessing a mob, replace its brain with SmartBrainLib-controlled brain.
+- Behaviors:
+  - `FollowOwnerTask` (follow the player).
+  - `AttackTargetTask` (attack entities that attack the player).
+  - `GuardPositionTask` (if player sneaks, stay at current location).
+
+**SmartBrainLib Integration:**
+- Each summoned entity has a custom `BrainProvider`.
+- Use `SmartBrain` with tasks:
+  - Core tasks: `LookAtTargetTask`, `SwimTask`.
+  - Combat tasks: `MeleeAttackTask`, `RangedAttackTask`.
+  - Utility tasks: `FollowOwnerTask`, `StrollTask`.
+
+**Despawn:** All summoned mobs despawn after their duration (defined per ability). When they despawn, remove any lingering effects.
+
+---
+
+### 4.9. YACL Config Screen
+
+**Access:** Mods menu → "15 Races" → Config.
+
+**Configurable options:**
+
+| Category | Option | Default | Description |
+|----------|--------|---------|-------------|
+| General | Enable Races | true | Enable/disable entire mod |
+| General | Show Welcome Message | true | Show message on first join |
+| General | Grant Book on Join | true | Give selection book on first join |
+| Balance | Ability Cooldown Multiplier | 1.0 | Global cooldown scaling (0.5 = half, 2.0 = double) |
+| Balance | Ability Damage Multiplier | 1.0 | Global damage scaling |
+| Balance | Race Point Gain Multiplier | 1.0 | Global point gain scaling |
+| Balance | Ring Experience Multiplier | 1.0 | Global exp gain scaling |
+| Visual | Show Actionbar Messages | true | Show ability activation messages |
+| Visual | Show Cooldown Overlay | true | Show cooldown on hotbar |
+| Server | Allow Reset | true | Allow players to reset points |
+| Server | Reset Cost Enabled | true | Require resources for reset |
+
+---
+
+### 4.10. Passive Effects & Penalties (Per Race)
+
+Each race has passive traits and penalties that are applied **every tick** via the `onTick()` method in the race's data handler.
+
+**Example: Эхо-Голем**
+```java
+// Every tick:
+if (player.getRaceId() == 1) {
+    // Passive: hunger drains 1.5x faster when sprinting
+    if (player.isSprinting()) {
+        player.getFoodData().addExhaustion(0.015f); // extra
+    }
+    // Penalty: standing on wool/slime reduces ability power
+    Block block = player.getBlockStateOn().getBlock();
+    if (block == Blocks.WOOL || block == Blocks.SLIME_BLOCK) {
+        player.getPersistentData().putBoolean("echo_golem_weakened", true);
+    } else {
+        player.getPersistentData().putBoolean("echo_golem_weakened", false);
+    }
+}
+```
+
+**All penalties are implemented in the tick handler.**
+
+---
+
+## 5. LIST OF RACES (15) WITH ABILITIES
+
+*(Abilities are the same as in the datapack spec, but now implemented as Java classes with level scaling, cooldowns, and costs.)*
+
+### Race 1: Эхо-Голем (Echo Golem)
+- **Focus Item:** Tuning Fork (not needed, ring is focus)
+- **Passive:** Hunger drains 1.5× when sprinting; sees vibration particles.
+- **Penalty:** 30% weaker on wool/slime; note blocks deal 1♥ damage.
+
+**Abilities (8):**
+1. Звуковой удар – AoE 5 blocks, 4 damage, knockback.
+2. Сейсмический прыжок – Jump, shockwave, destroys soft blocks.
+3. Резонанс – Make a block resonant (damage on touch).
+4. Глушитель – Silence field (mobs don't hear you).
+5. Эхолокация – Highlight entities/ores within 30 blocks.
+6. Вибрационный щит – Reflect 50% damage, take 30% of reflected.
+7. Звуковой взлом – Instantly break stone/obsidian, take 3♥.
+8. Акустический ускоритель – +40% damage/radius to sound abilities for 10 sec.
+
+### Race 2: Мнемо-Инженер (Mnemo-Engineer)
+- **Passive:** Inventory shuffles every 2 min (2400 ticks), Blindness II for 3 sec.
+- **Penalty:** Can't open chests/shulkers; food restores only 1 hunger.
+
+**Abilities (8):**
+1. Сохранение точки – Save coordinates/health (3 slots).
+2. Откат – Teleport to saved point, restore state.
+3. Забывание – Target confused for 5 sec (costs golden apple).
+4. Реверс блоков – Revert one block's state.
+5. Имитация – Copy entity appearance for 15 sec.
+6. Временная петля – Zone where entities revert position.
+7. Сброс инвентаря – Replace inventory with random items.
+8. Когнитивная перегрузка – Double next ability's power, lose 4♥.
+
+### Race 3: Химера-Симбионт (Chimera-Symbiont)
+- **Passive:** No armor/weapons; regen 1♥/5 sec out of combat.
+- **Penalty:** Below 3 hunger lose 1♥/min; possessed mobs become hostile.
+
+**Abilities (8):**
+1. Вселение в моба – Possess non-boss mob.
+2. Одержимость блоком – Merge with block, invulnerable 10 sec.
+3. Паразитическое касание – Life drain 1♥/2 sec, heal self.
+4. Колония – Slime trail gives allies +20% speed.
+5. Эволюция – Absorb mob drop for trait (1 min).
+6. Размножение – Summon 3 slimes (explode after 20 sec).
+7. Чужеродная форма – Double size, +100% damage, -30% speed.
+8. Поглощение – Consume item drop, restore 4♥.
+
+### Race 4: Ткач Измерений (Dimension Weaver)
+- **Passive:** Ender pearls don't teleport.
+- **Penalty:** 10% teleport error (10 blocks up); Nether 50% failure.
+
+**Abilities (8):**
+1. Сложение – Swap two blocks within 10 blocks.
+2. Разрыв – Create 5-block portal corridor (5 sec).
+3. Телепортационный якорь – Place marker (3 max), teleport back.
+4. Сжатие – Halve enemy attack range for 10 sec.
+5. Изгиб – Immune to projectiles for 6 sec.
+6. Карманное измерение – 9-slot temp inventory (2 min).
+7. Пространственный взрыв – Throw enemies 20 blocks, 3 damage.
+8. Искривление пространства – Distort projectiles for 8 sec.
+
+### Race 5: Кинетик-Пиромант (Kinetic Pyromancer)
+- **Passive:** Immune to fire; sprint leaves fire trail.
+- **Penalty:** Standing still >3 sec = 1♥/sec; cold biomes slow; water = 1♥/sec; can't sleep.
+
+**Abilities (8):**
+1. Разгон – +60% speed 10 sec, then -30% 5 sec.
+2. Искра – Fireball damage = 5 + blocks walked/2 (max +10).
+3. Термо-щит – Fire barrier (2 damage/sec to enemies).
+4. Кинетический удар – Damage = speed%/2.
+5. Поглощение тепла – Absorb lava/fire, restore 3♥.
+6. Взрывной бег – Ignite blocks, 2 damage to enemies.
+7. Перегрузка – Release energy = walked blocks/2 (max 20 damage).
+8. Огненный след – Passive fire trail (1 damage/sec).
+
+### Race 6: Лунный Жнец (Lunar Reaper)
+- **Passive:** Night: 20♥, +30% speed, 8 damage; Day: 12♥, -20% speed, 3 damage; potions don't work at night.
+- **Penalty:** Can't mine ore at day; must kill mob each night or lose 3♥ max health.
+
+**Abilities (8):**
+1. Лунный свет – Beam, 10 damage (night only).
+2. Тень – Invisibility 8 sec (true at night).
+3. Цикл – Skip day to night (50-block radius), lose 10♥.
+4. Жнец душ – Passive: kill mob at night → +0.5 damage per 10 souls.
+5. Спящий агент – Sleep during day, wake at night at bed location.
+6. Лунный зов – Summon 2 wolves (night only).
+7. Затмение – Suppress light sources for 10 sec.
+8. Лунная регенерация – Passive: 1♥/5 sec at night.
+
+### Race 7: Грав-Ткач (Gravity Weaver)
+- **Passive:** Double fall damage (even 1 block = 1♥).
+- **Penalty:** Heavy armor reduces speed 40%; water drowning 2×.
+
+**Abilities (8):**
+1. Переворот – Walk on ceilings/walls for 10 sec.
+2. Притяжение – Pull enemies, 3 damage on collision.
+3. Отталкивание – Push enemies 15 blocks, fall damage.
+4. Утяжеление – Zone: Slowness III, no jumping for 8 sec.
+5. Левитация – Float 5 blocks for 5 sec.
+6. Гравитационная сфера – Low gravity zone (30 sec).
+7. Метеорит – Drop block on enemy (damage = block type).
+8. Гравитационный колодец – Pull mobs to center, 1 damage/2 sec.
+
+### Race 8: Энтропийный Разрушитель (Entropy Destroyer)
+- **Passive:** Can't place blocks; inventory 18 slots.
+- **Penalty:** Opening chests breaks them; random block breaks every 5 min.
+
+**Abilities (8):**
+1. Распад – Instantly break any block (except bedrock).
+2. Удар хаоса – 10 damage, 50% teleport enemy.
+3. Энтропийный взрыв – Explosion (8 damage to enemies, 4 to self).
+4. Старение – Enemy loses 2♥/3 sec for 15 sec.
+5. Разрушение защиты – Remove enemy armor for 5 sec.
+6. Кратковременная стабильность – Temporary wall (10 sec).
+7. Аннигиляция – Delete enemy item, deal 5 damage.
+8. Распад материи – Convert block to regen particles.
+
+### Race 9: Теневой Дипломат (Shadow Diplomat)
+- **Passive:** Invisible to mobs if no armor and not attacking.
+- **Penalty:** Attacking makes all mobs hostile for 1 min; can't wield weapons.
+
+**Abilities (8):**
+1. Приказ – Control mob for 30 sec (max 3).
+2. Страх – Enemies flee for 5 sec.
+3. Иллюзия – Create decoy that runs away.
+4. Тёмный договор – Swap bodies with mob/player for 10 sec.
+5. Сбор информации – See health/inventory for 10 sec.
+6. Укрытие во тьме – Full invisibility 15 sec.
+7. Массовый гипноз – Paralyze enemies for 8 sec.
+8. Теневая сфера – Darkness zone for 12 sec.
+
+### Race 10: Алхимик-Трансмутатор (Alchemist-Transmutor)
+- **Passive:** Can't use crafting tables/furnaces.
+- **Penalty:** 10% explosion on transmutation; inventory changes every 5 min.
+
+**Abilities (8):**
+1. Трансмутация – Convert block to random ore.
+2. Упрочнение – +200% tool durability for 1 min.
+3. Превращение в жидкость – Make block passable for 10 sec.
+4. Алхимический щит – Absorb 4 damage.
+5. Обмен веществ – Convert 2♥ ↔ 4 hunger.
+6. Золотое касание – Instantly kill low-health mob.
+7. Стабилизация – Restore blocks in 5-block radius.
+8. Синтез – Create random potion from 3 items.
+
+### Race 11: Садовник-Симбиот (Gardener-Symbiont)
+- **Passive:** Regens in sunlight; can't eat meat; water = 1♥/sec.
+- **Penalty:** Can't use stone/diamond tools (only wood/gold); need plant near spawn.
+
+**Abilities (8):**
+1. Благословение роста – Instantly grow crops in 10-block radius.
+2. Целебный сок – Touch grass/leaves, regen + heal allies.
+3. Корневая связь – Plant root (3 max), boosts growth.
+4. Природная броня – Leaf armor (4 armor) for 20 sec.
+5. Фотосинтез – Regen hunger/health in sunlight.
+6. Обмен веществ – Meat → bonemeal.
+7. Цветочный дождь – Rain of flowers, instant growth.
+8. Оплетение – Slow/ damage enemies in 5-block radius.
+
+### Race 12: Странник-Картограф (Wanderer-Cartographer)
+- **Passive:** See coordinates; map auto-fills; sprint no hunger.
+- **Penalty:** Spawn fixed at world spawn; map limited to 500×500; 10% teleport error.
+
+**Abilities (8):**
+1. Запись координат – Save coordinate (max 5).
+2. Телепорт к точке – Teleport to saved coordinate.
+3. Анализ биома – Show biomes/structures in 200-block radius.
+4. Временная тропа – Glowing trail, +30% speed.
+5. Портальная петля – Create two portals (15 sec).
+6. Интуиция – Highlight hidden chests/ores.
+7. Возврат – keepInventory on death (10 min cooldown).
+8. Ориентация – Always know north.
+
+### Race 13: Редстоун-Инженер (Redstone Engineer)
+- **Passive:** See signal strength; Haste I on redstone.
+- **Penalty:** 5% chance machines catch fire; holding redstone >30 sec = lightning.
+
+**Abilities (8):**
+1. Усиление сигнала – Increase signal to 15 for 10 sec.
+2. Временная цепь – Invisible wire (10 blocks, 15 sec).
+3. Глушитель – Disable redstone in 5-block radius for 5 sec.
+4. Сканирование схем – Show component count in 10-block radius.
+5. Быстрая починка – Repair redstone component.
+6. Энергетический взрыв – Explosion at active wire.
+7. Копирование схемы – Copy 5×5 circuit.
+8. Редстоун-сенсор – Detect entities by signal.
+
+### Race 14: Меркантильный Маг (Mercantile Mage)
+- **Passive:** 30% villager discount; can't kill villagers.
+- **Penalty:** Can't mine diamonds/emeralds; lose 10% emeralds on death; chests inaccessible.
+
+**Abilities (8):**
+1. Алхимия предметов – Convert 4 items to random resource (costs emerald).
+2. Улучшение жителя – Level up villager with golden apple.
+3. Валютный обмен – Exchange emeralds for resources.
+4. Торговый импульс – Instant trades for 10 sec.
+5. Привлечение ресурса – Point to most valuable resource.
+6. Переработка мусора – Junk → useful block.
+7. Защитная сделка – Hire mob for 1 min.
+8. Бартер – Exchange XP for emeralds/diamonds.
+
+### Race 15: Глубинный Гном (Deep Gnome)
+- **Passive:** Night Vision; see ores through walls (8-block radius).
+- **Penalty:** Above Y=60: lose 1♥/10 sec + Slowness I; no boats/bows; 18-slot inventory.
+
+**Abilities (8):**
+1. Бросок кирки – Throw pickaxe, break block.
+2. Создание туннеля – 3×3 tunnel forward (5 blocks).
+3. Эхолокация – Highlight ores/chests for 5 sec.
+4. Каменная кожа – +6 armor, -40% speed for 15 sec.
+5. Туннельный рывок – Phase through blocks (5 blocks).
+6. Чутьё на опасность – See mobs through walls underground.
+7. Подземный союз – Summon cave spider (20 sec).
+8. Сталагмит – Stone spike deals 5 damage.
+
+---
+
+## 6. TECHNICAL IMPLEMENTATION DETAILS
+
+### 6.1. Capability System
+
+**RaceData.java:**
+```java
+public class RaceData {
+    private int raceId = 0; // 0 = none
+    private boolean hasChosen = false;
+    private int racePoints = 0;
+    private boolean[] unlockedAbilities = new boolean[8]; // 8 abilities max
+    private int[] spentPoints = new int[8]; // points invested per ability
+    private int selectedBranch = -1; // -1 = none, 0 = branch A, 1 = branch B
+    private float accessoryExp = 0f;
+    private int accessoryLevel = 0;
+    private long[] abilityCooldowns = new long[8]; // tick cooldowns
+
+    // Getters/setters, sync via packets
+}
+```
+
+**Provider:**
+```java
+@CapabilityInject(RaceData.class)
+public static final Capability<RaceData> RACE_DATA_CAP = null;
+```
+
+**Attach to Player:**
+```java
+@SubscribeEvent
+public static void attachCapability(AttachCapabilitiesEvent<Entity> event) {
+    if (event.getObject() instanceof Player) {
+        event.addCapability(new ResourceLocation(RacesMod.MOD_ID, "race_data"),
+            new RaceDataProvider());
+    }
+}
+```
+
+### 6.2. Network Sync
+
+**Packet:** `SyncRaceDataPacket` (server → client)
+- Send on: join, level up, point change, ability unlock, cooldown update.
+- Client receives and updates local `RaceData` (stored in client-side cache).
+
+**Keybind Packet:** `AbilityActivationPacket` (client → server)
+- Contains: ability ID (0-7).
+- Server validates and executes ability.
+
+### 6.3. Cooldown Management
+
+Cooldowns stored in `RaceData.abilityCooldowns` (array of long ticks).
+- On ability use: set to `System.currentTimeMillis() + (cooldownTicks * 50)`.
+- In tick handler: if `cooldown > currentTime`, ability is unavailable.
+- Cooldown reduction from ring level: `cooldownTicks * (1 - level * 0.02)`.
+
+### 6.4. SmartBrainLib Integration
+
+**SummonedMob.java:**
+```java
+public class SummonedMob extends Mob implements BrainEntity<SummonedMob> {
+    private final Brain<SummonedMob> brain;
+
+    @Override
+    protected BrainProvider<SummonedMob> brainProvider() {
+        return SmartBrainLib.createProvider(this, new SummonedMobBrain());
+    }
+
+    @Override
+    public Brain<SummonedMob> getBrain() {
+        return brain;
+    }
+}
+```
+
+**Brain Definition:**
+```java
+public class SummonedMobBrain extends Brain<SummonedMob> {
+    public SummonedMobBrain() {
+        addTask(new FollowOwnerTask(1.2f, 16));
+        addTask(new MeleeAttackTask(1.0f));
+        addTask(new GuardPositionTask(0.8f)); // when owner sneaks
+    }
+}
+```
+
+### 6.5. YACL Config Integration
+
+**Config Class:**
+```java
+public class RacesConfig implements Config {
+    public static final Config INSTANCE = new RacesConfig();
+
+    @Entry @Name("Enable Races") @Description("Enable/disable the entire mod")
+    public boolean enableRaces = true;
+
+    @Entry @Name("Ability Cooldown Multiplier") @Range(min=0.1, max=5.0)
+    public double cooldownMultiplier = 1.0;
+
+    // ... etc
+}
+```
+
+**Register with YACL:**
+```java
+@Mod.EventBusSubscriber
+public class ConfigRegister {
+    @SubscribeEvent
+    public static void onModConfig(ModConfigEvent event) {
+        YACL. registerConfig(RacesMod.MOD_ID, RacesConfig.INSTANCE);
+    }
+}
+```
+
+### 6.6. GUI Implementation
+
+**ProgressionTreeScreen.java:**
+- Extends `Screen`.
+- Uses `DrawContext` for rendering.
+- Widgets: `AbilityNodeWidget` (clickable), `BranchChoiceWidget`.
+- Data loaded from JSON (sync with server via packet).
+
+**Rendering:**
+```java
+@Override
+public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    // Background
+    // Draw tier headers
+    // Draw ability nodes with icons (texture or colored boxes)
+    // Draw lines connecting nodes
+    // Draw points counter
+}
+```
+
+**Keybind open:** `KeyBindings.openTree = new KeyBinding("key.races.openTree", GLFW.GLFW_KEY_G, "key.categories.races");`
+
+---
+
+## 7. FILE STRUCTURE (Resources)
+
+```
+resources/
+├── assets/
+│   └── races/
+│       ├── lang/
+│       │   ├── en_us.json   # For code comments
+│       │   └── ru_ru.json   # All in-game text (Russian)
+│       ├── textures/
+│       │   ├── ring_echo_golem.png
+│       │   ├── ring_mnemo_engineer.png
+│       │   └── ... (15 rings)
+│       ├── gui/
+│       │   ├── tree_bg.png
+│       │   └── icons/       # 15 race icons
+│       └── sounds/          # Optional ability sounds
+├── data/
+│   └── races/
+│       └── trees/
+│           ├── race_1.json
+│           ├── race_2.json
+│           └── ... (15 JSON files)
+└── META-INF/
+    └── neoforge.mods.toml
+```
+
+---
+
+## 8. TESTING CHECKLIST
+
+Before final delivery, verify:
+
+- [ ] All 15 races selectable via book/GUI.
+- [ ] Ring equips correctly in Curios slot.
+- [ ] Only one ring can be equipped.
+- [ ] Race selection is permanent.
+- [ ] Race Points are gained from all listed actions.
+- [ ] Ability tree loads from JSON.
+- [ ] Points can be spent on abilities.
+- [ ] Branch selection locks the other branch.
+- [ ] Abilities are activated by keybinds.
+- [ ] Cooldowns work correctly (with ring level reduction).
+- [ ] Passive effects and penalties apply every tick.
+- [ ] Summoned mobs use SmartBrainLib AI.
+- [ ] GUI renders correctly (no crashes).
+- [ ] YACL config screen opens and saves settings.
+- [ ] All in-game text is in Russian.
+- [ ] Multiplayer sync works (race data persists across server restart).
+- [ ] No console errors or performance issues.
+
+---
+
+## 9. DELIVERY REQUIREMENTS
+
+The final output must be:
+
+1. A **mod .jar file** (ready to drop into `mods/` folder).
+2. **Full source code** (Git repository or zip).
+3. **build.gradle** (configured for NeoForge 1.21.1).
+4. **README.md** (in Russian) explaining installation and usage.
+5. **User manual** (in Russian) describing all races, abilities, and progression.
+
+---
+
+## 10. FINAL INSTRUCTIONS TO THE DEVELOPER
+
+- **DO NOT** deviate from the specifications above.
+- **DO NOT** add extra features or abilities not listed.
+- **DO NOT** use mods, libraries, or APIs beyond the specified stack.
+- **DO** use only NeoForge 1.21.1 and the listed libraries.
+- **DO** triple-check every class, registry, and capability for correctness.
+- **DO** ensure all GUI screens are responsive and don't crash.
+- **DO** provide clear comments in Java classes (English or Russian).
+- **DO** test in both single-player and multiplayer environments.
+
+This document is the sole source of truth. If any ambiguity arises, default to the most straightforward implementation that matches the described behavior.
+
+---
+
+**END OF SPECIFICATION**
