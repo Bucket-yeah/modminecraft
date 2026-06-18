@@ -1,0 +1,28 @@
+{
+  "race_id": 8,
+  "race_name": "Энтропийный Разрушитель",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["decay", "chaos_strike", "entropy_explosion"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Разложение",
+        "cost_per_ability": 20,
+        "abilities": ["aging", "armor_break"]
+      },
+      "branch_b": {
+        "name": "Хаос",
+        "cost_per_ability": 20,
+        "abilities": ["brief_stability", "annihilation"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["matter_decay"]
+  }
+}

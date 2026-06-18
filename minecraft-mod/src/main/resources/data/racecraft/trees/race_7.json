@@ -1,0 +1,28 @@
+{
+  "race_id": 7,
+  "race_name": "Грав-Ткач",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["inversion", "attraction", "repulsion"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Гравитация",
+        "cost_per_ability": 20,
+        "abilities": ["heaviness", "levitation"]
+      },
+      "branch_b": {
+        "name": "Сила",
+        "cost_per_ability": 20,
+        "abilities": ["gravity_sphere", "meteorite"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["gravity_well"]
+  }
+}

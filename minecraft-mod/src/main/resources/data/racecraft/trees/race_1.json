@@ -1,0 +1,28 @@
+{
+  "race_id": 1,
+  "race_name": "Эхо-Голем",
+  "tier1": {
+    "cost": 0,
+    "abilities": ["sound_burst", "seismic_jump", "resonance"]
+  },
+  "tier2": {
+    "threshold": 0,
+    "branches": {
+      "branch_a": {
+        "name": "Акустика",
+        "cost_per_ability": 20,
+        "abilities": ["silencer", "echolocation"]
+      },
+      "branch_b": {
+        "name": "Защита",
+        "cost_per_ability": 20,
+        "abilities": ["vibration_shield", "sonic_break"]
+      }
+    }
+  },
+  "tier3": {
+    "threshold": 100,
+    "cost_per_ability": 30,
+    "abilities": ["acoustic_accelerator"]
+  }
+}

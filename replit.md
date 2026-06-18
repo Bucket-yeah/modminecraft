@@ -1,15 +1,27 @@
-# [Project name]
+# EternityRaces (racecraft)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+NeoForge 1.21.1 Minecraft мод с 15 игровыми расами, каждая имеет 8 активных способностей, пассивные черты, деревья прокачки и штрафы. Весь внутриигровой текст на русском языке.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/api-server run dev` — запуск API сервера (порт 5000)
+- `pnpm run typecheck` — проверка типов по всем пакетам
+- `pnpm run build` — typecheck + сборка всех пакетов
+- `pnpm --filter @workspace/api-spec run codegen` — регенерация API хуков и Zod схем из OpenAPI
+- `pnpm --filter @workspace/db run push` — применить изменения схемы БД (только dev)
+- Required env: `DATABASE_URL` — строка подключения Postgres
+
+## Minecraft Mod Build
+
+Мод находится в `minecraft-mod/`. Для сборки нужен Gradle (входит в gradlew):
+
+```bash
+cd minecraft-mod
+./gradlew build
+# Артефакт: build/libs/racecraft-1.0.0.jar
+```
+
+Требования для сборки: Java 21 JDK, подключение к интернету (для скачивания зависимостей NeoForge).
 
 ## Stack
 
@@ -20,17 +32,48 @@ _Replace the heading above with the project's name, and this line with one sente
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
+### Minecraft Mod Stack
+
+- NeoForge 21.1.172 (MC 1.21.1)
+- Curios 7.1.3+1.21.1 (слоты экипировки)
+- GeckoLib 4.6 (анимации мобов)
+- SmartBrainLib 1.13 (AI призванных мобов)
+- YACL 3.5.0+1.21.1-neoforge (конфигурация)
+
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `minecraft-mod/src/main/java/com/eternity/races/` — весь исходный код мода
+  - `RacesMod.java` — точка входа, регистрация всех событий и компонентов
+  - `common/ability/abilities/` — 15 файлов с 8 способностями каждой расы
+  - `common/handler/RaceEventHandler.java` — все пассивные черты, штрафы, прогрессия
+  - `common/progression/` — система деревьев прокачки (JSON-конфиги + загрузчик)
+  - `common/mob/` — 3 класса призванных мобов (волк, паук, слизень)
+  - `client/gui/` — экраны выбора расы и дерева способностей
+  - `common/network/` — 5 сетевых пакетов (SelectRace, Ability, Unlock, Reset, Sync)
+- `minecraft-mod/src/main/resources/data/racecraft/trees/` — 15 JSON деревьев прокачки
+- `minecraft-mod/src/main/resources/assets/racecraft/lang/ru_ru.json` — локализация (120+ ключей)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Progression через JSON**: деревья прокачки грузятся как ResourceReloadListener — позволяет менять баланс без перекомпиляции.
+- **AttachmentType для RaceData**: NeoForge 1.21.1 `AttachmentType` вместо устаревших Capabilities. Данные сохраняются в NBT игрока.
+- **AbilityManager как реестр**: все способности регистрируются по паре (raceId, abilityIndex), позволяя находить их по O(1).
+- **SummonedMob + SmartBrainLib**: призванные существа следуют за хозяином и атакуют его врагов через SmartBrain AI.
+- **PacketDistributor**: сеть использует NeoForge 1.21.1 API (`PacketDistributor.sendToPlayer`, `sendToServer`).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Игрок выбирает расу через книгу выбора расы (`/give @s racecraft:race_selection_book`). Каждая раса даёт:
+- 8 активных способностей (привязаны к клавишам R/G/H/J/Y/U/I/O)
+- Уникальные пассивные черты (реген HP, иммунитеты, бонусы к крафту)
+- Дерево прокачки (30 очков, ветки A/B, Tier 3 финальная способность)
+- Штрафы (дебаффы, зависящие от расы)
+
+### 15 рас:
+1. Эхо-Голем, 2. Алхимик-Трансмутор, 3. Химера-Симбионт, 4. Измерительный Ткач,
+5. Гравитационный Ткач, 6. Лунный Жнец, 7. Торговый Маг, 8. Мнемо-Инженер,
+9. Кинетический Пиромант, 10. Рэдстоун-Инженер, 11. Тень-Дипломат,
+12. Странник-Картограф, 13. Садовник-Симбионт, 14. Энтропийный Разрушитель, 15. Глубинный Гном
 
 ## User preferences
 
@@ -38,8 +81,14 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- `MobEffects.SILENCE` не существует в 1.21.1 — заменён на WEAKNESS+MOVEMENT_SLOWDOWN
+- `MobEffects.THORNS` не существует в 1.21.1 — заменён флагом персистентных данных `nature_armor_expire`
+- `MobEffects.STRENGTH` → `MobEffects.DAMAGE_BOOST` в 1.21.1
+- `neoforge.mods.toml`: секция `[[mods]]` должна быть ДО `[[dependencies.*]]`
+- Атрибуты EntityType регистрируются через `EntityAttributeCreationEvent` на `modEventBus`
+- ProgressionLoader регистрируется через `AddReloadListenerEvent` на `NeoForge.EVENT_BUS`
 
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Полная техническая спецификация: `attached_assets/Pasted--COMPREHENSIVE-TECHNICAL-SPECIFICATION-Minecraft-Mod-15_1781807068770.txt`
